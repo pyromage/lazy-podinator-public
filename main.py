@@ -365,7 +365,8 @@ def generate_scripts(selected_urls):
     Your Task:
     1. For EACH show, you have been provided with full article content.
     2. Write a DETAILED 30-SECOND DISCUSSION for each article (approximately 75-90 words per topic).
-       - Tone: Insider, fast-paced, professional - like Bloomberg Radio or WSJ podcasts.
+       - Tone: Conversational, natural speech - like a real radio host, not a news anchor
+       - Use contractions (it's, we're, that's) and natural phrasing
        - Each topic must include:
          * The key facts and what happened
          * Why it matters and the implications
@@ -373,14 +374,18 @@ def generate_scripts(selected_urls):
          * Market impact, trends, or industry significance
        - NO generic statements like "In conclusion" or "This is important"
        - NO brief 1-2 sentence summaries - each topic needs FULL 30-second treatment
-       - Example length: "PayPal just acquired Cymbio for an undisclosed sum to boost its agentic commerce capabilities. Cymbio's marketplace automation platform enables merchants to sell through AI-powered platforms like Microsoft Copilot and Perplexity. This acquisition comes as PayPal pushes deeper into AI-driven commerce, where conversational AI assistants are becoming new storefronts. The deal gives PayPal direct access to Cymbio's automated product feed management across 500+ marketplaces, positioning them ahead of traditional payment processors in the emerging agentic commerce space."
+       - Example: "Here's something interesting - PayPal just acquired Cymbio, and this one's all about AI-powered shopping. Cymbio's got this marketplace automation platform that lets merchants sell through AI assistants like Microsoft Copilot and Perplexity. We're talking about conversational AI that's basically becoming the new storefront. The deal gives PayPal access to Cymbio's automated product feeds across more than 500 marketplaces. So they're positioning themselves ahead of traditional payment processors in what's being called agentic commerce."
     3. Aggregate all topic summaries into a single podcast script for each show.
-       - Start with a brief welcome (1-2 sentences)
-       - Use smooth transitions between topics: "Next up...", "Meanwhile...", "In other news...", "Turning to..."
+       - Start with a natural welcome (1-2 sentences) - sound like a radio host, not a robot
+       - After EACH topic, add a clear pause marker: "... [PAUSE] ..."
+       - Use smooth transitions: "Next up...", "Meanwhile...", "In other news...", "Moving on...", "Here's an interesting one..."
        - Each show should have approximately 20 topics with 30 seconds each = ~10 minutes total
-       - End with a brief sign-off (1 sentence)
+       - End with a brief, natural sign-off (1 sentence)
 
-    CRITICAL: Each topic must be 75-90 words. If you provide shorter summaries, the podcast will be too short.
+    CRITICAL FORMATTING:
+    - Each topic must be 75-90 words
+    - After every single topic, include "... [PAUSE] ..." on its own line to create a 2-second break
+    - Use natural, conversational language with contractions
 
     Return JSON format only with keys: {keys_description}
     Each value should be the complete podcast script for that show.
@@ -416,7 +421,7 @@ def generate_scripts(selected_urls):
             raise
 
 def generate_audio(script_text, voice_model):
-    """Converts text to WAV using Piper TTS, then to MP3"""
+    """Converts text to WAV using Piper TTS, then to MP3 with natural pacing"""
     model_path = os.path.join(MODELS_PATH, f"{voice_model}.onnx")
     config_path = os.path.join(MODELS_PATH, f"{voice_model}.onnx.json")
 
@@ -427,27 +432,33 @@ def generate_audio(script_text, voice_model):
         mp3_path = mp3_file.name
 
     try:
-        # Run Piper to generate WAV
+        # Remove [PAUSE] markers - we'll handle pauses with sentence silence
+        cleaned_text = script_text.replace("[PAUSE]", "").replace("...", ".")
+
+        # Run Piper to generate WAV with improved parameters for natural speech
         process = subprocess.run(
             [
                 PIPER_PATH,
                 "--model", model_path,
                 "--config", config_path,
+                "--length-scale", "1.1",  # Slightly slower for more natural pacing (default is 1.0)
+                "--sentence-silence", "0.8",  # 800ms pause between sentences (default is 0.2)
                 "--output_file", wav_path
             ],
-            input=script_text.encode('utf-8'),
+            input=cleaned_text.encode('utf-8'),
             capture_output=True,
             check=True
         )
         print(f"Piper output: {process.stderr.decode()}")
 
-        # Convert WAV to MP3 using ffmpeg
+        # Convert WAV to MP3 using ffmpeg with audio normalization for better quality
         subprocess.run(
             [
                 "ffmpeg", "-y",
                 "-i", wav_path,
+                "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",  # Normalize audio levels
                 "-codec:a", "libmp3lame",
-                "-qscale:a", "2",
+                "-qscale:a", "2",  # High quality MP3
                 mp3_path
             ],
             capture_output=True,
