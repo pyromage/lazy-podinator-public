@@ -1,0 +1,81 @@
+{
+  "stablecoin": {
+    "title": "The Stablecoin Ledger",
+    "description": "Your daily 10-minute briefing on stablecoins, payments, and digital finance. Up to 20 topics covering USDC, USDT, and regulatory developments.",
+    "author": "Lazy Podinator",
+    "email": "diepstn@gmail.com",
+    "category": "News",
+    "artwork": "https://storage.googleapis.com/YOUR_BUCKET/artwork/stablecoin.png",
+    "voice": "en_US-ryan-high",
+    "duration": "600",
+    "feeds": [
+      "https://www.coindesk.com/arc/outboundfeeds/rss/",
+      "https://cointelegraph.com/rss/tag/stablecoin",
+      "https://www.theblock.co/rss.xml",
+      "https://www.finextra.com/rss/channel.aspx?channel=payments",
+      "https://www.finextra.com/rss/channel.aspx?channel=crypto",
+      "https://www.finextra.com/rss/channel.aspx?channel=startups",
+      "https://www.paymentsdive.com/feeds/news/",
+      "https://finovate.com/feed/",
+      "https://www.fintechweekly.com/news.rss",
+      "https://www.fintechweekly.com/magazine/articles.rss",
+      "https://bullrich.dev/tldr-rss/feed.rss",
+      "https://betakit.com/"
+    ],
+    "gmail_labels": [
+      "Newsletters/TLDR"
+    ],
+    "keywords": [
+      "stablecoin",
+      "USDC",
+      "USDT",
+      "payments",
+      "defi",
+      "stripe",
+      "visa",
+      "mastercard",
+      "cybrid",
+      "circle",
+      "thunes"
+    ]
+  },
+  "ai": {
+    "title": "AI Technology Morning Brief",
+    "description": "Your daily 10-minute AI news digest. Up to 20 topics on LLMs, agents, hardware, and the latest from OpenAI, Anthropic, Gemini and beyond.",
+    "author": "Lazy Podinator",
+    "email": "diepstn@gmail.com",
+    "category": "Technology",
+    "artwork": "https://storage.googleapis.com/YOUR_BUCKET/artwork/ai.png",
+    "voice": "en_US-amy-medium",
+    "duration": "600",
+    "feeds": [
+      "https://techcrunch.com/category/artificial-intelligence/feed/",
+      "https://www.finextra.com/rss/channel.aspx?channel=ai",
+      "https://machinelearningmastery.com/blog/feed/",
+      "https://www.marktechpost.com/feed/",
+      "https://bair.berkeley.edu/blog/feed.xml",
+      "https://research.google/blog/rss/",
+      "https://news.mit.edu/rss/topic/artificial-intelligence2",
+      "https://www.artificial-intelligence.blog/ai-news?format=rss",
+      "https://ai2people.com/feed/",
+      "https://techspective.net/category/technology/artificial-intelligence/feed/",
+      "https://bullrich.dev/tldr-rss/feed.rss",
+      "https://betakit.com/"
+    ],
+    "gmail_labels": [
+      "Newsletters/AI"
+    ],
+    "keywords": [
+      "LLM",
+      "transformer",
+      "generative ai",
+      "neural",
+      "openai",
+      "anthropic",
+      "finance",
+      "fintech",
+      "gemini",
+      "agentic"
+    ]
+  }
+}

@@ -1,0 +1,91 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Claude Code
+.claude/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+service-account*.json
+credentials.json
+gmail_credentials.json
+gmail_token.json
+
+# Google Cloud
+.gcloud/
+.config/gcloud/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.cover
+.hypothesis/
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Audio Files (generated podcasts)
+*.mp3
+*.wav
+
+# Logs
+*.log
+logs/
+
+# Temporary Files
+*.tmp
+*.temp
+.cache/
+
+# Test output
+output/
+
+# Piper TTS (local testing)
+piper/
