@@ -1,14 +1,12 @@
 # Lazy Podinator
 
-Serverless, "set-and-forget" automation engine that turns raw RSS feeds and email newsletters into high-quality, AI-hosted daily podcasts.
-
-Built for developers who want a daily audio briefing on specific niche topics (e.g., Stablecoins, AI, BioTech) without the manual effort of reading newsletters.
+Serverless, "set-and-forget" automation engine that turns raw RSS feeds and email newsletters into high-quality, AI-hosted daily podcasts. Built for developers who want a daily audio briefing on specific niche topics (e.g., Stablecoins, AI, BioTech) without the manual effort of reading newsletters.
 
 ## What It Does
 
 Every morning at 8:00 AM EST (or your preferred time), Lazy Podinator:
 
-1. **Ingests:** Scrapes headlines from the last 3 days via RSS feeds and email newsletters (TLDR, Morning Brew, etc.).
+1. **Ingests:** Scrapes headlines from the last 3 days via RSS feeds and email newsletters in your inbox (TLDR, Morning Brew, etc.).
 2. **Analyzes:** Uses Anthropic Claude to act as an "Executive Producer"—selecting up to 20 of the most relevant topics for each show.
 3. **Scripts:** Writes a 30-second professional summary for each topic, creating a ~10 minute podcast per show.
 4. **Broadcasts:** Generates an HD audio file using Piper TTS (free, local text-to-speech).
@@ -17,13 +15,50 @@ Every morning at 8:00 AM EST (or your preferred time), Lazy Podinator:
 
 ## Architecture
 
-The system runs entirely on **Google Cloud Platform (Serverless)**, meaning it costs $0 when idle and requires no server maintenance.
+The system runs entirely on **Google Cloud Platform (Serverless)**.
 
 * **Compute:** Google Cloud Run (Docker container)
 * **Trigger:** Google Cloud Scheduler (Cron)
 * **Storage:** Google Cloud Storage (Buckets)
 * **Intelligence:** Anthropic Claude API
 * **TTS:** Piper TTS (free, open-source, runs locally in container)
+
+## Project Structure
+
+```text
+lazy-podinator/
+├── main.py                      # Main application (Flask server + podcast generation)
+├── Dockerfile                   # Docker build configuration for Cloud Run
+├── requirements.txt             # Python dependencies
+├── shows_config.json            # Podcast show configuration (feeds, keywords, voices)
+├── .env                         # Environment variables (not in git)
+├── .env.example                 # Example environment variables
+├── .gitignore                   # Git ignore rules
+├── README.md                    # This file
+├── LICENSE                      # MIT License
+├── scripts/                     # Deployment and utility scripts
+│   ├── deploy.sh               # Main deployment script for Cloud Run
+│   ├── update_config.sh        # Update shows_config.json without redeploying
+│   └── setup_piper_macos.sh    # Local Piper TTS setup for macOS
+├── test/                        # Testing scripts
+│   ├── test_local.py           # Test script generation (no audio)
+│   ├── test_audio.py           # Test audio generation with local Piper
+│   ├── test_audio_docker.sh    # Test audio with Docker (recommended)
+│   ├── test_audio_macos.sh     # Test audio with macOS 'say' command
+│   └── test_cleanup.py         # Test 30-day cleanup functionality
+├── docs/                        # Additional documentation
+│   └── requirements.md         # Original requirements specification
+├── artwork/                     # Podcast cover art (1400x1400 to 3000x3000 px)
+│   ├── README.md               # Artwork creation guide
+│   ├── stablecoin.png          # Cover for The Stablecoin Ledger
+│   └── ai.png                  # Cover for AI Technology Morning Brief
+└── output/                      # Generated files (local testing only)
+    ├── scripts.json            # Generated podcast scripts
+    ├── stablecoin_script.txt   # Individual show scripts
+    ├── ai_script.txt
+    ├── stablecoin_podcast.mp3  # Generated audio files
+    └── ai_podcast.mp3
+```
 
 ## Prerequisites
 
@@ -36,32 +71,59 @@ The system runs entirely on **Google Cloud Platform (Serverless)**, meaning it c
 
 ### Shows Configuration
 
-Edit `shows_config.json` to customize your podcasts:
+Edit `shows_config.json` to customize your podcasts. Each show has its own curated list of RSS feeds, Gmail labels, and keywords:
 
 ```json
 {
   "stablecoin": {
     "title": "The Stablecoin Ledger",
-    "description": "Your daily 10-minute briefing on stablecoins and payments.",
+    "description": "Your daily 10-minute briefing on stablecoins, payments, and digital finance.",
     "author": "Your Name",
     "email": "you@example.com",
     "category": "News",
-    "artwork": "https://storage.googleapis.com/YOUR_BUCKET/artwork/cover.jpg",
+    "artwork": "https://storage.googleapis.com/YOUR_BUCKET/artwork/stablecoin.png",
     "voice": "en_US-ryan-high",
     "duration": "600",
-    "keywords": ["stablecoin", "USDC", "payments"]
+    "feeds": [
+      "https://www.coindesk.com/arc/outboundfeeds/rss/",
+      "https://www.finextra.com/rss/channel.aspx?channel=payments",
+      "https://www.paymentsdive.com/feeds/news/"
+    ],
+    "gmail_labels": ["Newsletters/TLDR"],
+    "keywords": ["stablecoin", "USDC", "USDT", "payments", "defi"]
+  },
+  "ai": {
+    "title": "AI Technology Morning Brief",
+    "description": "Your daily 10-minute AI news digest.",
+    "author": "Your Name",
+    "email": "you@example.com",
+    "category": "Technology",
+    "artwork": "https://storage.googleapis.com/YOUR_BUCKET/artwork/ai.png",
+    "voice": "en_US-amy-medium",
+    "duration": "600",
+    "feeds": [
+      "https://techcrunch.com/category/artificial-intelligence/feed/",
+      "https://www.finextra.com/rss/channel.aspx?channel=ai"
+    ],
+    "gmail_labels": ["Newsletters/AI"],
+    "keywords": ["LLM", "transformer", "generative ai", "neural", "openai"]
   }
 }
 ```
 
-**Required fields for Spotify/Apple Podcasts:**
+**Configuration Fields:**
 
-* `title` - Podcast name
-* `description` - Show description (appears in podcast apps)
-* `author` - Your name or organization
-* `email` - Contact email (required by some directories)
-* `artwork` - Cover image URL (must be 1400x1400 to 3000x3000 pixels, JPG or PNG)
-* `category` - Podcast category (News, Technology, Business, etc.)
+* `title` - Podcast name (required)
+* `description` - Show description shown in podcast apps (required)
+* `author` - Your name or organization (required)
+* `email` - Contact email (required by podcast directories)
+* `category` - Podcast category: News, Technology, Business, etc. (required)
+* `artwork` - Cover image URL, must be 1400x1400 to 3000x3000 pixels, JPG or PNG (required)
+* `voice` - Piper TTS voice model (required)
+* `duration` - Estimated episode duration in seconds, "600" = 10 minutes (required)
+* `feeds` - Array of RSS feed URLs to monitor (required)
+* `gmail_labels` - Array of Gmail labels to fetch newsletters from (optional)
+* `keywords` - Array of topic keywords for AI content selection (required)
 
 **Available Piper Voices:**
 
@@ -71,40 +133,6 @@ Edit `shows_config.json` to customize your podcasts:
 * `en_GB-alan-medium` - British male voice
 
 See all voices at: <https://rhasspy.github.io/piper-samples/>
-
-### RSS Feeds & Content Sources
-
-Each show in `shows_config.json` has its own curated list of RSS feeds and Gmail labels. This allows you to target specific content sources for each podcast:
-
-```json
-{
-  "stablecoin": {
-    "title": "The Stablecoin Ledger",
-    "feeds": [
-      "https://www.coindesk.com/arc/outboundfeeds/rss/",
-      "https://www.finextra.com/rss/channel.aspx?channel=payments",
-      "https://www.paymentsdive.com/feeds/news/"
-    ],
-    "gmail_labels": ["Newsletters/TLDR"],
-    "keywords": ["stablecoin", "USDC", "USDT", "payments"]
-  },
-  "ai": {
-    "title": "AI Technology Morning Brief",
-    "feeds": [
-      "https://techcrunch.com/category/artificial-intelligence/feed/",
-      "https://www.finextra.com/rss/channel.aspx?channel=ai"
-    ],
-    "gmail_labels": ["Newsletters/AI"],
-    "keywords": ["LLM", "transformer", "generative ai"]
-  }
-}
-```
-
-**Benefits:**
-
-* **Targeted content** - Each show gets its own custom news sources
-* **Better relevance** - Feeds match the show's specific topic area
-* **Easy management** - All show configuration in one file
 
 ### Email Newsletters (Optional)
 
@@ -157,7 +185,7 @@ source .env
 Run the test script to generate podcast scripts without audio:
 
 ```bash
-python test_local.py
+python test/test_local.py
 ```
 
 This creates:
@@ -174,10 +202,10 @@ Docker is recommended for testing Piper TTS locally (matches production environm
 
 ```bash
 # Make script executable
-chmod +x test_audio_docker.sh
+chmod +x test/test_audio_docker.sh
 
 # Generate audio files
-./test_audio_docker.sh
+./test/test_audio_docker.sh
 ```
 
 This builds a Docker image with Piper TTS and generates MP3 files in `output/`.
@@ -194,8 +222,8 @@ mpg123 output/stablecoin_podcast.mp3  # Linux
 For quick testing on macOS without Docker:
 
 ```bash
-chmod +x test_audio_macos.sh
-./test_audio_macos.sh
+chmod +x test/test_audio_macos.sh
+./test/test_audio_macos.sh
 ```
 
 **Note:** This uses macOS `say` command (not Piper), so voices won't match production.
@@ -209,7 +237,7 @@ To verify that the 30-day cleanup works correctly:
 export BUCKET_NAME="your-podcast-bucket-name"
 
 # Run cleanup test
-python test_cleanup.py
+python test/test_cleanup.py
 ```
 
 This script will:
@@ -251,7 +279,7 @@ gcloud services enable gmail.googleapis.com  # Only if using Gmail
 
 ### 2. Configure Deployment Script
 
-Edit `deploy.sh` and set your values:
+Edit `scripts/deploy.sh` and set your values:
 
 ```bash
 PROJECT_ID="your-google-cloud-project-id"
@@ -298,16 +326,18 @@ Skip this if you're only using RSS feeds.
 2. Create an OAuth 2.0 Client ID (Desktop application)
 3. Download the JSON and save as `gmail_credentials.json` in project root
 4. Run locally once to authorize:
+
 ```bash
 python -c "from main import get_gmail_service; get_gmail_service()"
 ```
+
 5. This creates `gmail_token.json` - include both files in your Docker build
 
 ### 6. Deploy to Cloud Run
 
 ```bash
-chmod +x deploy.sh
-./deploy.sh
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
 ```
 
 This builds the Docker container (with Piper TTS baked in) and deploys to Cloud Run.
@@ -353,7 +383,7 @@ The configuration is stored in GCS and can be updated without rebuilding/redeplo
 vim shows_config.json
 
 # 2. Upload to GCS (takes 2 seconds)
-./update_config.sh
+./scripts/update_config.sh
 
 # Or manually:
 gcloud storage cp shows_config.json gs://YOUR_BUCKET_NAME/config/
@@ -365,7 +395,7 @@ Changes take effect on the next scheduled run (8:00 AM EST) or trigger immediate
 gcloud scheduler jobs run daily-pod-trigger --location=us-central1
 ```
 
-**Note:** Only redeploy (`./deploy.sh`) when you:
+**Note:** Only redeploy (`./scripts/deploy.sh`) when you:
 
 * Change Python code
 * Update dependencies
@@ -379,6 +409,12 @@ After your first episode generates, RSS feeds are available at:
 https://storage.googleapis.com/YOUR_BUCKET/stablecoin/feed.xml
 https://storage.googleapis.com/YOUR_BUCKET/ai/feed.xml
 ```
+
+### Live Shows
+
+**AI Technology Morning Brief** - [Listen on Spotify](https://open.spotify.com/show/6ltJZXfvr5ZeSavapFO056)
+
+**The Stablecoin Ledger** - [Listen on Spotify](https://open.spotify.com/show/5HxDtAnJk9FNCWVyQw8cmh)
 
 ### Submit to Spotify
 
@@ -423,43 +459,3 @@ This setup is designed to run within GCP's free tier:
 
 * **Anthropic API:** ~$0.50-$2.00/month (depends on article length and number of shows)
 * **Everything else:** $0 (within free tier)
-
-## Troubleshooting
-
-### Cloud Run Deployment Issues
-
-* **Error: "Docker build failed"** - Ensure Docker is running and you have sufficient disk space
-* **Error: "Permission denied"** - Run `gcloud auth login` to re-authenticate
-* **Error: "Bucket not found"** - Create the bucket first using step 3 above
-
-### Audio Generation Issues
-
-* **No audio files generated** - Check Cloud Run logs for Piper TTS errors
-* **Audio quality is poor** - Try different voice models in `shows_config.json`
-* **Audio is too long/short** - Adjust the `keywords` to filter content more specifically
-
-### Gmail API Issues
-
-* **Authentication errors** - Delete `gmail_token.json` and re-run authorization locally
-* **No emails found** - Verify Gmail labels exist and match `gmail_labels` in `shows_config.json` exactly
-
-### Script Content Issues
-
-* **Too few topics** - Reduce keyword specificity in `shows_config.json`
-* **Irrelevant topics** - Make keywords more specific or add more targeted RSS feeds
-* **Topics too old** - Check RSS feed URLs are still active
-
-### Storage & Cleanup Issues
-
-* **Old episodes still present** - Cleanup runs automatically during daily execution. Check Cloud Run logs for errors
-* **Storage quota exceeded** - Run `python test_cleanup.py` to manually test cleanup or reduce retention days
-* **Missing recent episodes** - Ensure episodes are named with correct date format: `YYYY-MM-DD_update.mp3`
-* **RSS feed empty** - Only episodes from last 30 days appear. Check bucket for recent uploads
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request.
-
-## License
-
-MIT License - See LICENSE file for details

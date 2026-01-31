@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Local test script - tests news fetching and script generation without audio.
-Run: python test_local.py
+Run from project root: python test/test_local.py
 
 Requires:
 - ANTHROPIC_API_KEY environment variable set
@@ -27,7 +27,10 @@ client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # Load configs
 def load_json_config(filename):
-    config_path = os.path.join(os.path.dirname(__file__), filename)
+    # Look in parent directory (root of project)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
+    config_path = os.path.join(parent_dir, filename)
     with open(config_path, 'r') as f:
         return json.load(f)
 
@@ -265,8 +268,10 @@ def main():
     # Step 3: Generate scripts from full content
     scripts = generate_scripts(selected_urls)
 
-    # Save scripts to files
-    output_dir = os.path.join(os.path.dirname(__file__), 'output')
+    # Save scripts to files (in root directory)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
+    output_dir = os.path.join(parent_dir, 'output')
     os.makedirs(output_dir, exist_ok=True)
 
     # Save full JSON

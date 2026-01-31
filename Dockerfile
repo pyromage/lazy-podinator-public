@@ -10,11 +10,6 @@ RUN apt-get update && apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Create swap file for low-memory environments (1GB swap)
-RUN fallocate -l 1G /swapfile && \
-    chmod 600 /swapfile && \
-    mkswap /swapfile
-
 # Download and install Piper TTS binary
 RUN mkdir -p /app/piper && \
     wget -q https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz -O /tmp/piper.tar.gz && \
@@ -45,5 +40,5 @@ COPY . .
 # Expose port for Cloud Run
 EXPOSE 8080
 
-# Enable swap before starting the app
-CMD swapon /swapfile && python main.py
+# Start the application
+CMD python main.py

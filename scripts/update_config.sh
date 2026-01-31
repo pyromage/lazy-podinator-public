@@ -1,12 +1,23 @@
 #!/bin/bash
 # Update shows_config.json in GCS without redeploying
 
-# --- CONFIGURATION ---
-# Load from deploy.sh or set here
-BUCKET_NAME="${BUCKET_NAME:-your-podcast-bucket-name}"
-# ---------------------
-
 set -e
+
+# --- LOAD ENVIRONMENT VARIABLES ---
+if [ -f .env ]; then
+    echo "Loading configuration from .env file..."
+    source .env
+else
+    echo "❌ Error: .env file not found"
+    echo "Please create a .env file based on .env.example"
+    exit 1
+fi
+
+# Validate required variables
+if [ -z "$BUCKET_NAME" ]; then
+    echo "❌ Error: BUCKET_NAME not set in .env"
+    exit 1
+fi
 
 echo "================================================"
 echo "Updating Podcast Configuration"

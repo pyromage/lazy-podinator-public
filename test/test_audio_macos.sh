@@ -9,7 +9,7 @@ echo "🎙️  Testing audio with macOS 'say' command..."
 # Check if output/scripts.json exists
 if [ ! -f "output/scripts.json" ]; then
     echo "❌ No scripts found in output/scripts.json"
-    echo "Run: python test_local.py first"
+    echo "Run: python test/test_local.py first"
     exit 1
 fi
 
@@ -50,4 +50,4 @@ echo "  afplay output/stablecoin_test.mp3"
 echo "  afplay output/ai_test.mp3"
 echo ""
 echo "Note: These use macOS voices, not Piper TTS."
-echo "      For production-quality audio, use Docker: ./test_audio_docker.sh"
+echo "      For production-quality audio, use Docker: ./test/test_audio_docker.sh"

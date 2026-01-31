@@ -28,7 +28,7 @@ $DOCKER_CMD build -t lazy-podinator-test . --quiet
 # Check if output/scripts.json exists
 if [ ! -f "output/scripts.json" ]; then
     echo "❌ No scripts found in output/scripts.json"
-    echo "Run: python test_local.py first"
+    echo "Run: python test/test_local.py first"
     exit 1
 fi
 

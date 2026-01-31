@@ -1,12 +1,35 @@
 #!/bin/bash
 
+# --- LOAD ENVIRONMENT VARIABLES ---
+if [ -f .env ]; then
+    echo "Loading configuration from .env file..."
+    source .env
+else
+    echo "❌ Error: .env file not found"
+    echo "Please create a .env file based on .env.example"
+    exit 1
+fi
+
 # --- CONFIGURATION ---
-PROJECT_ID="your-google-cloud-project-id"
-BUCKET_NAME="your-podcast-bucket-name"
-REGION="us-central1"
+REGION="northamerica-northeast1"  # Montreal
 SERVICE_NAME="lazy-podinator"
-ANTHROPIC_API_KEY="your-anthropic-api-key"
 # ---------------------
+
+# Validate required variables
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+    echo "❌ Error: ANTHROPIC_API_KEY not set in .env"
+    exit 1
+fi
+
+if [ -z "$PROJECT_ID" ]; then
+    echo "❌ Error: PROJECT_ID not set in .env"
+    exit 1
+fi
+
+if [ -z "$BUCKET_NAME" ]; then
+    echo "❌ Error: BUCKET_NAME not set in .env"
+    exit 1
+fi
 
 echo "================================================"
 echo "Step 1: Uploading Configuration"

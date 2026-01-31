@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Test audio generation locally using Piper TTS.
-Run: python test_audio.py
+Run from project root: python test/test_audio.py
 
 Requires:
-- Piper TTS installed locally (run setup_piper_macos.sh first)
+- Piper TTS installed locally (run scripts/setup_piper_macos.sh first)
 - Output scripts from test_local.py
 """
 
@@ -14,7 +14,10 @@ import subprocess
 
 # Load configs
 def load_json_config(filename):
-    config_path = os.path.join(os.path.dirname(__file__), filename)
+    # Look in parent directory (root of project)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
+    config_path = os.path.join(parent_dir, filename)
     with open(config_path, 'r') as f:
         return json.load(f)
 
@@ -89,8 +92,8 @@ def main():
     if not os.path.exists(PIPER_PATH):
         print("\n❌ Piper not found!")
         print("Run setup script first:")
-        print("  chmod +x setup_piper_macos.sh")
-        print("  ./setup_piper_macos.sh")
+        print("  chmod +x scripts/setup_piper_macos.sh")
+        print("  ./scripts/setup_piper_macos.sh")
         exit(1)
 
     # Check if output directory exists
