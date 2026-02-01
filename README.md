@@ -63,7 +63,7 @@ lazy-podinator/
 ## Prerequisites
 
 * **Google Cloud Platform Account** (Free Tier is sufficient)
-  * Enable APIs: `Cloud Run`, `Cloud Build`, `Cloud Storage`, `Cloud Scheduler`, `Artifact Registry`, `Gmail API`
+  * Enable APIs: `Cloud Run`, `Cloud Build`, `Cloud Storage`, `Cloud Scheduler`, `Artifact Registry`
 * **Anthropic API Key** (Get one at [console.anthropic.com](https://console.anthropic.com/))
 * **Google Cloud CLI (`gcloud`)** installed and authenticated
 
@@ -89,7 +89,6 @@ Edit `shows_config.json` to customize your podcasts. Each show has its own curat
       "https://www.finextra.com/rss/channel.aspx?channel=payments",
       "https://www.paymentsdive.com/feeds/news/"
     ],
-    "gmail_labels": ["Newsletters/TLDR"],
     "keywords": ["stablecoin", "USDC", "USDT", "payments", "defi"]
   },
   "ai": {
@@ -105,7 +104,6 @@ Edit `shows_config.json` to customize your podcasts. Each show has its own curat
       "https://techcrunch.com/category/artificial-intelligence/feed/",
       "https://www.finextra.com/rss/channel.aspx?channel=ai"
     ],
-    "gmail_labels": ["Newsletters/AI"],
     "keywords": ["LLM", "transformer", "generative ai", "neural", "openai"]
   }
 }
@@ -122,7 +120,6 @@ Edit `shows_config.json` to customize your podcasts. Each show has its own curat
 * `voice` - Piper TTS voice model (required)
 * `duration` - Estimated episode duration in seconds, "600" = 10 minutes (required)
 * `feeds` - Array of RSS feed URLs to monitor (required)
-* `gmail_labels` - Array of Gmail labels to fetch newsletters from (optional)
 * `keywords` - Array of topic keywords for AI content selection (required)
 
 **Available Piper Voices:**
@@ -133,14 +130,6 @@ Edit `shows_config.json` to customize your podcasts. Each show has its own curat
 * `en_GB-alan-medium` - British male voice
 
 See all voices at: <https://rhasspy.github.io/piper-samples/>
-
-### Email Newsletters (Optional)
-
-For newsletters that don't offer RSS (like TLDR), you can ingest them via Gmail:
-
-1. **Create Gmail labels** for your newsletters (e.g., `Newsletters/TLDR`)
-2. **Set up filters** to auto-label incoming newsletters
-3. **Add labels to your show config** in `shows_config.json` (see `gmail_labels` array above)
 
 ## Local Development & Testing
 
@@ -274,7 +263,6 @@ gcloud services enable cloudbuild.googleapis.com
 gcloud services enable storage.googleapis.com
 gcloud services enable cloudscheduler.googleapis.com
 gcloud services enable artifactregistry.googleapis.com
-gcloud services enable gmail.googleapis.com  # Only if using Gmail
 ```
 
 ### 2. Configure Deployment Script
@@ -318,22 +306,7 @@ See [artwork/README.md](artwork/README.md) for detailed instructions and example
 
 **Note:** The deploy script will automatically upload artwork files to your GCS bucket.
 
-### 5. Set Up Gmail API (Optional)
-
-Skip this if you're only using RSS feeds.
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Create an OAuth 2.0 Client ID (Desktop application)
-3. Download the JSON and save as `gmail_credentials.json` in project root
-4. Run locally once to authorize:
-
-```bash
-python -c "from main import get_gmail_service; get_gmail_service()"
-```
-
-5. This creates `gmail_token.json` - include both files in your Docker build
-
-### 6. Deploy to Cloud Run
+### 5. Deploy to Cloud Run
 
 ```bash
 chmod +x scripts/deploy.sh
@@ -344,7 +317,7 @@ This builds the Docker container (with Piper TTS baked in) and deploys to Cloud 
 
 Deployment takes 3-5 minutes. You'll see a service URL when complete.
 
-### 7. Set Up Daily Trigger
+### 6. Set Up Daily Trigger
 
 Create a Cloud Scheduler job to run at 8:00 AM EST daily:
 
@@ -358,7 +331,7 @@ gcloud scheduler jobs create http daily-pod-trigger \
 
 **Note:** `0 13 * * *` = 8:00 AM EST (13:00 UTC). Adjust for your timezone.
 
-### 8. Test the Deployment
+### 7. Test the Deployment
 
 Trigger manually to test:
 
@@ -372,7 +345,7 @@ Check Cloud Run logs:
 gcloud run services logs read lazy-podinator --region=us-central1 --limit=100
 ```
 
-### 9. Updating Configuration (No Redeploy Required!)
+### 8. Updating Configuration (No Redeploy Required!)
 
 The configuration is stored in GCS and can be updated without rebuilding/redeploying:
 

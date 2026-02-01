@@ -2,15 +2,10 @@ import os
 import json
 import subprocess
 import tempfile
-import base64
 import feedparser
 import anthropic
 import requests
 from google.cloud import storage
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 from email.utils import formatdate
 from flask import Flask, jsonify
@@ -29,9 +24,6 @@ BUCKET_NAME = os.environ.get("BUCKET_NAME")
 # Piper configuration
 PIPER_PATH = "/app/piper/piper"
 MODELS_PATH = "/app/piper/models"
-
-# Gmail API scopes
-GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
 # Load configuration from external JSON files
 def load_json_config(filename):
@@ -56,144 +48,6 @@ def load_json_config(filename):
 
 SHOWS = load_json_config('shows_config.json')
 
-def get_gmail_service():
-    """Initialize Gmail API service using stored credentials"""
-    creds = None
-    token_path = os.path.join(os.path.dirname(__file__), 'gmail_token.json')
-    credentials_path = os.path.join(os.path.dirname(__file__), 'gmail_credentials.json')
-
-    if os.path.exists(token_path):
-        creds = Credentials.from_authorized_user_file(token_path, GMAIL_SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not os.path.exists(credentials_path):
-                print("Gmail credentials not found. Skipping email fetch.")
-                return None
-            flow = InstalledAppFlow.from_client_secrets_file(credentials_path, GMAIL_SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        with open(token_path, 'w') as token:
-            token.write(creds.to_json())
-
-    return build('gmail', 'v1', credentials=creds)
-
-def parse_email_content(html_content):
-    """Extract headlines and summaries from newsletter HTML"""
-    soup = BeautifulSoup(html_content, 'html.parser')
-
-    articles = []
-
-    # Look for common newsletter patterns (headlines in h1, h2, h3, strong, or links)
-    for tag in soup.find_all(['h1', 'h2', 'h3']):
-        text = tag.get_text(strip=True)
-        if len(text) > 10 and len(text) < 200:
-            # Try to get the next paragraph as snippet
-            next_p = tag.find_next('p')
-            snippet = next_p.get_text(strip=True)[:200] if next_p else ""
-
-            # Try to find associated link
-            link = tag.find('a')
-            href = link.get('href', '') if link else ''
-
-            articles.append({
-                "title": text,
-                "link": href,
-                "snippet": snippet,
-                "source": "email"
-            })
-
-    # Also look for bold/strong text that might be headlines
-    if len(articles) < 3:
-        for tag in soup.find_all('strong')[:10]:
-            text = tag.get_text(strip=True)
-            if len(text) > 20 and len(text) < 150:
-                parent = tag.find_parent('p') or tag.find_parent('div')
-                snippet = parent.get_text(strip=True)[:200] if parent else ""
-                articles.append({
-                    "title": text,
-                    "link": "",
-                    "snippet": snippet,
-                    "source": "email"
-                })
-
-    return articles[:6]  # Limit to 6 articles per email
-
-def fetch_emails(gmail_labels):
-    """Fetch recent emails from specified Gmail labels"""
-    articles = []
-
-    if not gmail_labels:
-        return articles
-
-    service = get_gmail_service()
-    if not service:
-        return articles
-
-    print(f"Fetching emails from labels: {gmail_labels}")
-
-    for label_name in gmail_labels:
-        try:
-            # Get label ID from name
-            labels_result = service.users().labels().list(userId='me').execute()
-            label_id = None
-            for label in labels_result.get('labels', []):
-                if label['name'].lower() == label_name.lower():
-                    label_id = label['id']
-                    break
-
-            if not label_id:
-                print(f"Label '{label_name}' not found")
-                continue
-
-            # Get recent messages from this label (last 3 days)
-            query = "newer_than:3d"
-            results = service.users().messages().list(
-                userId='me',
-                labelIds=[label_id],
-                q=query,
-                maxResults=5
-            ).execute()
-
-            messages = results.get('messages', [])
-
-            for msg in messages:
-                msg_data = service.users().messages().get(
-                    userId='me',
-                    id=msg['id'],
-                    format='full'
-                ).execute()
-
-                # Get email subject
-                headers = msg_data.get('payload', {}).get('headers', [])
-                subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
-
-                # Get email body
-                payload = msg_data.get('payload', {})
-                body_html = ""
-
-                if 'parts' in payload:
-                    for part in payload['parts']:
-                        if part.get('mimeType') == 'text/html':
-                            body_data = part.get('body', {}).get('data', '')
-                            body_html = base64.urlsafe_b64decode(body_data).decode('utf-8')
-                            break
-                elif payload.get('mimeType') == 'text/html':
-                    body_data = payload.get('body', {}).get('data', '')
-                    body_html = base64.urlsafe_b64decode(body_data).decode('utf-8')
-
-                if body_html:
-                    email_articles = parse_email_content(body_html)
-                    articles.extend(email_articles)
-                    print(f"Extracted {len(email_articles)} articles from: {subject}")
-
-        except Exception as e:
-            print(f"Error fetching from label {label_name}: {e}")
-
-    return articles
-
 def fetch_rss_feeds(feed_urls):
     """Fetch articles from RSS feeds"""
     articles = []
@@ -215,31 +69,21 @@ def fetch_rss_feeds(feed_urls):
     return articles
 
 def fetch_news():
-    """Ingests news from RSS feeds and email newsletters"""
+    """Ingests news from RSS feeds"""
     articles = []
 
-    # Aggregate feeds and labels from all shows
+    # Aggregate feeds from all shows
     all_feeds = set()
-    all_labels = set()
 
     for show_key, config in SHOWS.items():
         # Collect feeds for this show
         feeds = config.get('feeds', [])
         all_feeds.update(feeds)
 
-        # Collect Gmail labels for this show
-        labels = config.get('gmail_labels', [])
-        all_labels.update(labels)
-
     # Fetch from RSS feeds (deduplicated across shows)
     if all_feeds:
         print(f"Fetching from {len(all_feeds)} unique RSS feeds...")
         articles.extend(fetch_rss_feeds(list(all_feeds)))
-
-    # Fetch from Gmail labels (deduplicated across shows)
-    if all_labels:
-        print(f"Fetching from {len(all_labels)} Gmail labels...")
-        articles.extend(fetch_emails(list(all_labels)))
 
     print(f"Total articles fetched: {len(articles)}")
     return articles

@@ -20,10 +20,8 @@
       "https://www.fintechweekly.com/news.rss",
       "https://www.fintechweekly.com/magazine/articles.rss",
       "https://bullrich.dev/tldr-rss/feed.rss",
-      "https://betakit.com/"
-    ],
-    "gmail_labels": [
-      "Newsletters/TLDR"
+      "https://www.coindesk.com/arc/outboundfeeds/rss",
+      "https://betakit.com/tag/feeds/"
     ],
     "keywords": [
       "stablecoin",
@@ -36,6 +34,9 @@
       "mastercard",
       "cybrid",
       "circle",
+      "fireblocks",
+      "coinbase",
+      "bitpay",
       "thunes"
     ]
   },
@@ -61,9 +62,6 @@
       "https://techspective.net/category/technology/artificial-intelligence/feed/",
       "https://bullrich.dev/tldr-rss/feed.rss",
       "https://betakit.com/"
-    ],
-    "gmail_labels": [
-      "Newsletters/AI"
     ],
     "keywords": [
       "LLM",
