@@ -1,6 +1,9 @@
 # Use Python slim image for smaller size
 FROM python:3.11-slim
 
+# Set environment variables for Python
+ENV PYTHONUNBUFFERED=1
+
 # Set working directory
 WORKDIR /app
 

@@ -515,7 +515,10 @@ def daily_podcast_entrypoint():
         }), 200
 
     except Exception as e:
-        print(f"Error: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error occurred: {e}")
+        print(f"Full traceback:\n{error_details}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":

@@ -75,7 +75,7 @@ gcloud run deploy $SERVICE_NAME \
     --allow-unauthenticated \
     --memory=1Gi \
     --cpu=1 \
-    --timeout=300s \
+    --timeout=900s \
     --set-env-vars BUCKET_NAME=$BUCKET_NAME,ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
     --project=$PROJECT_ID
 
