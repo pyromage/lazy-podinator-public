@@ -22,7 +22,13 @@
       "https://bullrich.dev/tldr-rss/feed.rss",
       "https://www.coindesk.com/arc/outboundfeeds/rss",
       "https://www.google.ca/alerts/feeds/12185845428755238998/7636327126918619595",
-      "https://betakit.com/tag/feeds/"
+      "https://betakit.com/tag/feeds/",
+      "https://news.google.com/rss/search?q=stablecoin&hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=CBDC+central+bank+digital+currency&hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=crypto+payments&hl=en-US&gl=US&ceid=US:en",
+      "https://decrypt.co/feed",
+      "https://www.ledgerinsights.com/feed/",
+      "https://www.pymnts.com/feed/"
     ],
     "keywords": [
       "stablecoin",
@@ -38,7 +44,8 @@
       "fireblocks",
       "coinbase",
       "bitpay",
-      "thunes"
+      "thunes",
+      "CBDC"
     ]
   },
   "ai": {
@@ -63,7 +70,13 @@
       "https://techspective.net/category/technology/artificial-intelligence/feed/",
       "https://bullrich.dev/tldr-rss/feed.rss",
       "https://www.google.ca/alerts/feeds/12185845428755238998/9537471292624868280",
-      "https://betakit.com/"
+      "https://betakit.com/",
+      "https://news.google.com/rss/search?q=artificial+intelligence+LLM&hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=OpenAI+Anthropic+Google+AI&hl=en-US&gl=US&ceid=US:en",
+      "https://importai.substack.com/feed",
+      "https://huggingface.co/blog/feed.xml",
+      "https://www.deeplearning.ai/the-batch/feed/",
+      "http://export.arxiv.org/rss/cs.AI"
     ],
     "keywords": [
       "LLM",
@@ -75,7 +88,9 @@
       "finance",
       "fintech",
       "gemini",
-      "agentic"
+      "agentic",
+      "Claude",
+      "GPT"
     ]
   }
 }
