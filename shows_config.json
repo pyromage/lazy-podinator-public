@@ -92,5 +92,56 @@
       "Claude",
       "GPT"
     ]
+  },
+  "space": {
+    "title": "The Final Frontier Daily",
+    "description": "Your daily 10-minute briefing on space exploration, rockets, Mars colonization, asteroid mining, and the commercial space race.",
+    "author": "Lazy Podinator",
+    "email": "diepstn@gmail.com",
+    "category": "Science",
+    "artwork": "https://storage.googleapis.com/lazy-podinator-podcasts/artwork/space.png",
+    "voice": "en_US-ryan-high",
+    "duration": "600",
+    "feeds": [
+      "https://www.space.com/feeds/all",
+      "https://spacenews.com/feed/",
+      "https://www.nasaspaceflight.com/feed/",
+      "https://arstechnica.com/space/feed/",
+      "https://www.universetoday.com/feed/",
+      "https://www.planetary.org/articles/rss",
+      "https://phys.org/rss-feed/space-news/",
+      "https://www.esa.int/rssfeed/Our_Activities/Space_Science",
+      "https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss",
+      "https://blogs.nasa.gov/spacestation/feed/",
+      "https://www.sciencedaily.com/rss/space_time.xml",
+      "https://news.google.com/rss/search?q=SpaceX+Starship&hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=asteroid+mining&hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=Mars+colonization&hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=rocket+launch&hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=Blue+Origin+Rocket+Lab&hl=en-US&gl=US&ceid=US:en",
+      "https://everydayastronaut.com/feed/"
+    ],
+    "keywords": [
+      "SpaceX",
+      "Starship",
+      "Falcon",
+      "NASA",
+      "Artemis",
+      "Mars",
+      "colonization",
+      "asteroid",
+      "mining",
+      "rocket",
+      "launch",
+      "Blue Origin",
+      "Rocket Lab",
+      "satellite",
+      "orbit",
+      "moon",
+      "lunar",
+      "ISS",
+      "telescope",
+      "Elon Musk"
+    ]
   }
 }
