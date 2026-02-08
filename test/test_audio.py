@@ -23,12 +23,44 @@ def load_json_config(filename):
 
 SHOWS = load_json_config('shows_config.json')
 
+# Pronunciation guide for TTS
+_pronunciation_guide = None
+
+def load_pronunciation_guide():
+    """Load pronunciation guide (cached after first load)"""
+    global _pronunciation_guide
+    if _pronunciation_guide is None:
+        try:
+            _pronunciation_guide = load_json_config('pronunciation_guide.json')
+        except Exception as e:
+            print(f"  Warning: Could not load pronunciation guide: {e}")
+            _pronunciation_guide = {"acronyms": {}, "proper_nouns": {}, "technical_terms": {}}
+    return _pronunciation_guide
+
+def apply_pronunciation_fixes(text, show_key=None):
+    """Replace difficult words with TTS-friendly respellings before Piper TTS."""
+    import re
+    guide = load_pronunciation_guide()
+
+    # Acronyms and proper nouns: case-sensitive whole-word match
+    for category in ['acronyms', 'proper_nouns']:
+        for word, respelling in guide.get(category, {}).items():
+            pattern = r'\b' + re.escape(word) + r'\b'
+            text = re.sub(pattern, respelling, text)
+
+    # Technical terms: case-insensitive whole-word match
+    for word, respelling in guide.get('technical_terms', {}).items():
+        pattern = r'\b' + re.escape(word) + r'\b'
+        text = re.sub(pattern, respelling, text, flags=re.IGNORECASE)
+
+    return text
+
 # Piper configuration (local paths)
 PIPER_PATH = "./piper/piper"
 MODELS_PATH = "./piper/models"
 OUTPUT_DIR = "./output"
 
-def generate_audio(script_text, voice_model, output_filename):
+def generate_audio(script_text, voice_model, output_filename, show_key=None):
     """Converts text to WAV using Piper TTS, then to MP3"""
     model_path = os.path.join(MODELS_PATH, f"{voice_model}.onnx")
     config_path = os.path.join(MODELS_PATH, f"{voice_model}.onnx.json")
@@ -38,6 +70,9 @@ def generate_audio(script_text, voice_model, output_filename):
 
     try:
         print(f"  🎙️  Generating audio with {voice_model}...")
+
+        # Apply pronunciation fixes for TTS
+        script_text = apply_pronunciation_fixes(script_text, show_key=show_key)
 
         # Run Piper to generate WAV
         process = subprocess.run(
@@ -128,7 +163,7 @@ def main():
         print(f"   Words: {word_count} | Est. duration: {est_duration:.1f} minutes")
 
         output_filename = f"{show_key}_podcast"
-        mp3_path = generate_audio(script, config['voice'], output_filename)
+        mp3_path = generate_audio(script, config['voice'], output_filename, show_key=show_key)
 
         if mp3_path:
             print(f"\n   🎵 Play with: afplay {mp3_path}")

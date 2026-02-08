@@ -1,0 +1,40 @@
+{
+  "acronyms": {
+    "USDC": "U.S.D.C.",
+    "USDT": "U.S.D.T.",
+    "CBDC": "C.B.D.C.",
+    "CBDCs": "C.B.D.C.s",
+    "FSDP": "F.S.D.P.",
+    "LLM": "L.L.M.",
+    "LLMs": "L.L.M.s",
+    "NGN": "N.G.N.",
+    "ACH": "A.C.H.",
+    "FCA": "F.C.A.",
+    "CNMV": "C.N.M.V.",
+    "ESA": "E.S.A.",
+    "ISS": "I.S.S.",
+    "ABA": "A.B.A.",
+    "SMEs": "S.M.E.s",
+    "GenAI": "Jen A.I.",
+    "xAI": "ex A.I.",
+    "ONNX": "ON-ex",
+    "LUFS": "L.U.F.S.",
+    "CSA": "C.S.A.",
+    "ECB": "E.C.B."
+  },
+  "proper_nouns": {
+    "Cymbio": "Simbeeoh",
+    "Ubyx": "You-bix",
+    "Kaszek": "Kah-shek",
+    "Amodei": "Ah-mo-day",
+    "Giannandrea": "Jah-nan-dray-uh",
+    "Davos": "Dah-vohs",
+    "JAXA": "Jax-uh",
+    "ISRO": "Iz-roh",
+    "Grokipedia": "Grok-ih-pee-dee-uh"
+  },
+  "technical_terms": {
+    "DeFi": "dee-fye",
+    "onchain": "on chain"
+  }
+}

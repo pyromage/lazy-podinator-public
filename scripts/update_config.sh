@@ -32,6 +32,11 @@ fi
 echo "📤 Uploading shows_config.json to gs://$BUCKET_NAME/config/..."
 gcloud storage cp shows_config.json gs://$BUCKET_NAME/config/shows_config.json
 
+if [ -f "pronunciation_guide.json" ]; then
+    echo "📤 Uploading pronunciation_guide.json to gs://$BUCKET_NAME/config/..."
+    gcloud storage cp pronunciation_guide.json gs://$BUCKET_NAME/config/pronunciation_guide.json
+fi
+
 echo ""
 echo "✅ Configuration updated!"
 echo ""

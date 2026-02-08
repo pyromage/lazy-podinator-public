@@ -48,6 +48,38 @@ def load_json_config(filename):
 
 SHOWS = load_json_config('shows_config.json')
 
+# Pronunciation guide for TTS
+_pronunciation_guide = None
+
+def load_pronunciation_guide():
+    """Load pronunciation guide (cached after first load)"""
+    global _pronunciation_guide
+    if _pronunciation_guide is None:
+        try:
+            _pronunciation_guide = load_json_config('pronunciation_guide.json')
+        except Exception as e:
+            print(f"Warning: Could not load pronunciation guide: {e}")
+            _pronunciation_guide = {"acronyms": {}, "proper_nouns": {}, "technical_terms": {}}
+    return _pronunciation_guide
+
+def apply_pronunciation_fixes(text, show_key=None):
+    """Replace difficult words with TTS-friendly respellings before Piper TTS."""
+    import re
+    guide = load_pronunciation_guide()
+
+    # Acronyms and proper nouns: case-sensitive whole-word match
+    for category in ['acronyms', 'proper_nouns']:
+        for word, respelling in guide.get(category, {}).items():
+            pattern = r'\b' + re.escape(word) + r'\b'
+            text = re.sub(pattern, respelling, text)
+
+    # Technical terms: case-insensitive whole-word match
+    for word, respelling in guide.get('technical_terms', {}).items():
+        pattern = r'\b' + re.escape(word) + r'\b'
+        text = re.sub(pattern, respelling, text, flags=re.IGNORECASE)
+
+    return text
+
 def fetch_rss_feeds(feed_urls):
     """Fetch articles from RSS feeds"""
     articles = []
@@ -231,6 +263,13 @@ def generate_scripts(selected_urls):
     - After every single topic, include "... [PAUSE] ..." on its own line to create a 2-second break
     - Use natural, conversational language with contractions
 
+    PRONUNCIATION FOR TEXT-TO-SPEECH:
+    These scripts will be read aloud by a text-to-speech engine. To ensure correct pronunciation:
+    - Spell out acronyms with periods between letters: USDC -> "U.S.D.C.", CBDC -> "C.B.D.C.", LLM -> "L.L.M.", ESA -> "E.S.A.", FSDP -> "F.S.D.P."
+    - Exception for acronyms commonly pronounced as words: NASA, JAXA, ISRO stay as-is
+    - Write "xAI" as "ex A.I." and "GenAI" as "Jen A.I."
+    - Avoid leaving bare acronyms that a TTS engine might try to pronounce as a single word
+
     Return JSON format only with keys: {keys_description}
     Each value should be the complete podcast script for that show.
     Do not include any text before or after the JSON object."""
@@ -264,7 +303,7 @@ def generate_scripts(selected_urls):
             print(f"ERROR: Could not find JSON in response: {response_text[:500]}")
             raise
 
-def generate_audio(script_text, voice_model):
+def generate_audio(script_text, voice_model, show_key=None):
     """Converts text to WAV using Piper TTS, then to MP3 with natural pacing"""
     model_path = os.path.join(MODELS_PATH, f"{voice_model}.onnx")
     config_path = os.path.join(MODELS_PATH, f"{voice_model}.onnx.json")
@@ -278,6 +317,9 @@ def generate_audio(script_text, voice_model):
     try:
         # Remove [PAUSE] markers - we'll handle pauses with sentence silence
         cleaned_text = script_text.replace("[PAUSE]", "").replace("...", ".")
+
+        # Apply pronunciation fixes for TTS
+        cleaned_text = apply_pronunciation_fixes(cleaned_text, show_key=show_key)
 
         # Run Piper to generate WAV with improved parameters for natural speech
         process = subprocess.run(
@@ -493,7 +535,7 @@ def daily_podcast_entrypoint():
 
             if script_key in scripts_json:
                 print(f"Generating audio for {config['title']}...")
-                audio_data = generate_audio(scripts_json[script_key], config['voice'])
+                audio_data = generate_audio(scripts_json[script_key], config['voice'], show_key=show_key)
 
                 public_url = upload_to_bucket(audio_data, show_key)
                 results[show_key] = public_url

@@ -198,6 +198,13 @@ def generate_scripts(selected_urls):
 
     CRITICAL: Each topic must be 75-90 words. If you provide shorter summaries, the podcast will be too short.
 
+    PRONUNCIATION FOR TEXT-TO-SPEECH:
+    These scripts will be read aloud by a text-to-speech engine. To ensure correct pronunciation:
+    - Spell out acronyms with periods between letters: USDC -> "U.S.D.C.", CBDC -> "C.B.D.C.", LLM -> "L.L.M.", ESA -> "E.S.A.", FSDP -> "F.S.D.P."
+    - Exception for acronyms commonly pronounced as words: NASA, JAXA, ISRO stay as-is
+    - Write "xAI" as "ex A.I." and "GenAI" as "Jen A.I."
+    - Avoid leaving bare acronyms that a TTS engine might try to pronounce as a single word
+
     Return JSON format only with keys: {keys_description}
     Each value should be the complete podcast script for that show.
     Do not include any text before or after the JSON object."""
