@@ -13,6 +13,7 @@ fi
 # --- CONFIGURATION ---
 REGION="northamerica-northeast1"  # Montreal
 SERVICE_NAME="lazy-podinator"
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${SERVICE_NAME}:latest"
 # ---------------------
 
 # Validate required variables
@@ -70,12 +71,24 @@ fi
 
 echo ""
 echo "================================================"
-echo "Step 3: Building and Deploying to Cloud Run"
+echo "Step 3: Building Docker Image with Cloud Build"
 echo "================================================"
 
-# Build and deploy using Cloud Build (builds the Docker image and deploys)
+# Build image using Cloud Build (avoids restricted run-sources-* bucket)
+gcloud builds submit \
+    --project=$PROJECT_ID \
+    --region=$REGION \
+    --tag=$IMAGE \
+    .
+
+echo ""
+echo "================================================"
+echo "Step 4: Deploying to Cloud Run"
+echo "================================================"
+
+# Deploy the pre-built image to Cloud Run
 gcloud run deploy $SERVICE_NAME \
-    --source=. \
+    --image=$IMAGE \
     --region=$REGION \
     --platform=managed \
     --allow-unauthenticated \
