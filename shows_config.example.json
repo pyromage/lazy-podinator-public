@@ -1,0 +1,51 @@
+{
+  "my_topic_1": {
+    "title": "Daily Tech Update",
+    "description": "Your daily 10-minute briefing on technology news and trends.",
+    "author": "Your Name",
+    "email": "your-email@example.com",
+    "category": "Technology",
+    "artwork": "https://storage.googleapis.com/YOUR_BUCKET_NAME/artwork/tech.png",
+    "voice": "en_US-ryan-high",
+    "duration": "600",
+    "feeds": [
+      "https://techcrunch.com/feed/",
+      "https://www.theverge.com/rss/index.xml",
+      "https://arstechnica.com/feed/",
+      "https://news.ycombinator.com/rss"
+    ],
+    "keywords": [
+      "technology",
+      "startup",
+      "innovation",
+      "software",
+      "hardware",
+      "AI",
+      "mobile"
+    ]
+  },
+  "my_topic_2": {
+    "title": "Financial Daily Brief",
+    "description": "Your daily 10-minute financial and business news digest.",
+    "author": "Your Name", 
+    "email": "your-email@example.com",
+    "category": "Business",
+    "artwork": "https://storage.googleapis.com/YOUR_BUCKET_NAME/artwork/finance.png",
+    "voice": "en_US-amy-medium",
+    "duration": "600",
+    "feeds": [
+      "https://feeds.bloomberg.com/markets/news.rss",
+      "https://www.reuters.com/business/finance/rss",
+      "https://www.wsj.com/xml/rss/3_7085.xml"
+    ],
+    "keywords": [
+      "finance",
+      "markets",
+      "economy",
+      "banking",
+      "investment",
+      "cryptocurrency",
+      "stocks"
+    ]
+  }
+}
