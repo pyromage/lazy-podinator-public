@@ -80,6 +80,79 @@ def apply_pronunciation_fixes(text, show_key=None):
 
     return text
 
+def normalize_for_tts(text):
+    """Normalize Unicode text for TTS: convert fancy Unicode letters to ASCII, strip emojis/symbols."""
+    import re
+    import unicodedata
+
+    # Strip lone surrogates (invalid Unicode that can't be normalized)
+    text = text.encode('utf-8', errors='ignore').decode('utf-8')
+    # NFKD converts mathematical bold/italic/script letters (𝐓𝐡𝐞, 𝗦𝗧𝗔) to their ASCII base forms
+    text = unicodedata.normalize('NFKD', text)
+
+    result = []
+    for ch in text:
+        cat = unicodedata.category(ch)
+        # Keep letters, numbers, punctuation, separators, and common whitespace
+        if cat[0] in ('L', 'N', 'P', 'Z') or ch in ('\n', '\t'):
+            result.append(ch)
+        else:
+            # Replace symbols, emojis, combining marks leftover, control chars with space
+            result.append(' ')
+
+    text = ''.join(result)
+    # Collapse multiple spaces / blank lines
+    text = re.sub(r'  +', ' ', text).strip()
+    return text
+
+
+def fetch_linkedin_top_content(urls):
+    """Fetch posts from LinkedIn top-content pages via JSON-LD structured data"""
+    articles = []
+    print("Fetching LinkedIn top-content pages...")
+
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=10, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            for tag in soup.find_all('script', type='application/ld+json'):
+                try:
+                    data = json.loads(tag.string)
+                    # CollectionPage wraps posts in mainEntity or hasPart
+                    posts = []
+                    if isinstance(data, dict):
+                        if data.get('@type') == 'CollectionPage':
+                            posts = data.get('hasPart', data.get('mainEntity', {}).get('itemListElement', []))
+                        elif data.get('@type') == 'ItemList':
+                            posts = data.get('itemListElement', [])
+
+                    for item in posts:
+                        post = item.get('item', item) if isinstance(item, dict) else item
+                        text = post.get('articleBody') or post.get('text', '')
+                        if not text:
+                            continue
+                        text = normalize_for_tts(text)
+                        author = post.get('author', {})
+                        author_name = author.get('name', 'LinkedIn') if isinstance(author, dict) else 'LinkedIn'
+                        articles.append({
+                            "title": f"{author_name}: {text[:80].strip()}...",
+                            "link": post.get('url', url),
+                            "snippet": text[:200],
+                            "source": "linkedin"
+                        })
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+
+            print(f"  {url}: {len([a for a in articles if a.get('source') == 'linkedin'])} posts")
+        except Exception as e:
+            print(f"Failed to fetch LinkedIn top-content {url}: {e}")
+
+    return articles
+
+
 def fetch_rss_feeds(feed_urls):
     """Fetch articles from RSS feeds"""
     articles = []
@@ -106,16 +179,23 @@ def fetch_news():
 
     # Aggregate feeds from all shows
     all_feeds = set()
+    all_linkedin = set()
 
     for show_key, config in SHOWS.items():
-        # Collect feeds for this show
         feeds = config.get('feeds', [])
         all_feeds.update(feeds)
+        linkedin_urls = config.get('linkedin_top_content', [])
+        all_linkedin.update(linkedin_urls)
 
     # Fetch from RSS feeds (deduplicated across shows)
     if all_feeds:
         print(f"Fetching from {len(all_feeds)} unique RSS feeds...")
         articles.extend(fetch_rss_feeds(list(all_feeds)))
+
+    # Fetch from LinkedIn top-content pages (deduplicated across shows)
+    if all_linkedin:
+        print(f"Fetching from {len(all_linkedin)} LinkedIn top-content pages...")
+        articles.extend(fetch_linkedin_top_content(list(all_linkedin)))
 
     print(f"Total articles fetched: {len(articles)}")
     return articles
@@ -182,7 +262,7 @@ def select_articles(articles):
 
     print("Step 1: Selecting top articles...")
     response = anthropic_client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=4096,
         messages=[
             {
@@ -276,7 +356,7 @@ def generate_scripts(selected_urls):
 
     print("Step 3: Generating podcast scripts...")
     response = anthropic_client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=16000,
         messages=[
             {

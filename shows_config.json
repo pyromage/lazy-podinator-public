@@ -30,6 +30,9 @@
       "https://www.ledgerinsights.com/feed/",
       "https://www.pymnts.com/feed/"
     ],
+    "linkedin_top_content": [
+      "https://www.linkedin.com/top-content/finance/stablecoins-in-finance/stablecoin-trends-for-cross-border-payments/"
+    ],
     "keywords": [
       "stablecoin",
       "USDC",
