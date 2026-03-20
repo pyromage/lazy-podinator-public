@@ -263,7 +263,7 @@ def select_articles(articles):
     print("Step 1: Selecting top articles...")
     response = anthropic_client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[
             {
                 "role": "user",
@@ -277,11 +277,18 @@ def select_articles(articles):
         return json.loads(response_text)
     except json.JSONDecodeError:
         import re
-        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        # Strip markdown code fences if present
+        cleaned = re.sub(r'^```(?:json)?\s*', '', response_text.strip(), flags=re.MULTILINE)
+        cleaned = re.sub(r'```\s*$', '', cleaned.strip(), flags=re.MULTILINE)
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            pass
+        json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
         if json_match:
             return json.loads(json_match.group(0))
         else:
-            print(f"ERROR: Could not parse selection response")
+            print(f"ERROR: Could not parse selection response. Raw response:\n{response_text[:500]}")
             return {}
 
 def generate_scripts(selected_urls):
@@ -603,6 +610,10 @@ def daily_podcast_entrypoint():
 
         # 2. Select top articles
         selected_urls = select_articles(news_data)
+
+        if not selected_urls:
+            print("ERROR: Article selection returned empty — aborting pipeline")
+            return jsonify({"error": "Article selection failed"}), 500
 
         # 3. Generate scripts from full content
         scripts_json = generate_scripts(selected_urls)
