@@ -22,6 +22,7 @@ anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY
 storage_client = storage.Client()
 BUCKET_NAME = os.environ.get("BUCKET_NAME")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+GMAIL_ENABLED = os.environ.get("GMAIL_ENABLED", "").lower() == "true"
 
 # Piper configuration
 PIPER_PATH = "/app/piper/piper"
@@ -192,6 +193,116 @@ def fetch_linkedin_top_content(urls):
     return articles
 
 
+def fetch_gmail_content(label_names):
+    """Fetch newsletter content from Gmail messages with specified labels (last 7 days)."""
+    import base64
+
+    articles = []
+    try:
+        service = get_gmail_service()
+    except Exception as e:
+        print(f"WARNING: Could not connect to Gmail: {e}")
+        return articles
+
+    # Resolve label names to IDs
+    try:
+        labels_response = service.users().labels().list(userId='me').execute()
+        label_map = {lbl['name']: lbl['id'] for lbl in labels_response.get('labels', [])}
+    except Exception as e:
+        print(f"WARNING: Could not list Gmail labels: {e}")
+        return articles
+
+    label_ids = []
+    for name in label_names:
+        if name in label_map:
+            label_ids.append(label_map[name])
+        else:
+            print(f"  WARNING: Gmail label '{name}' not found, skipping")
+
+    if not label_ids:
+        return articles
+
+    # Collect unique message IDs across all labels
+    msg_ids = set()
+    for label_id in label_ids:
+        try:
+            response = service.users().messages().list(
+                userId='me', labelIds=[label_id], q='newer_than:1d'
+            ).execute()
+            for msg in response.get('messages', []):
+                msg_ids.add(msg['id'])
+            # Handle pagination
+            while response.get('nextPageToken'):
+                response = service.users().messages().list(
+                    userId='me', labelIds=[label_id], q='newer_than:1d',
+                    pageToken=response['nextPageToken']
+                ).execute()
+                for msg in response.get('messages', []):
+                    msg_ids.add(msg['id'])
+        except Exception as e:
+            print(f"  WARNING: Could not list messages for label {label_id}: {e}")
+
+    print(f"  Found {len(msg_ids)} emails from last 7 days")
+
+    # Fetch each message
+    for msg_id in msg_ids:
+        try:
+            msg = service.users().messages().get(
+                userId='me', id=msg_id, format='full'
+            ).execute()
+
+            # Extract headers
+            headers = {h['name']: h['value'] for h in msg['payload'].get('headers', [])}
+            subject = headers.get('Subject', '(no subject)')
+
+            # Extract body
+            body_text = _extract_email_body(msg['payload'], base64)
+            if not body_text:
+                continue
+
+            articles.append({
+                "title": subject,
+                "link": f"https://mail.google.com/mail/u/0/#inbox/{msg_id}",
+                "snippet": body_text[:300],
+                "source": "email",
+                "full_text": body_text[:3000]
+            })
+        except Exception as e:
+            print(f"  WARNING: Could not fetch message {msg_id}: {e}")
+
+    print(f"  Extracted {len(articles)} newsletter articles from Gmail")
+    return articles
+
+
+def _extract_email_body(payload, base64_mod):
+    """Recursively extract text content from Gmail message payload."""
+    mime = payload.get('mimeType', '')
+
+    if mime == 'text/plain' and payload.get('body', {}).get('data'):
+        return base64_mod.urlsafe_b64decode(payload['body']['data']).decode('utf-8', errors='ignore')
+
+    parts = payload.get('parts', [])
+    plain_text = None
+    html_text = None
+    for part in parts:
+        part_mime = part.get('mimeType', '')
+        if part_mime == 'text/plain' and part.get('body', {}).get('data'):
+            plain_text = base64_mod.urlsafe_b64decode(part['body']['data']).decode('utf-8', errors='ignore')
+        elif part_mime == 'text/html' and part.get('body', {}).get('data'):
+            html_text = base64_mod.urlsafe_b64decode(part['body']['data']).decode('utf-8', errors='ignore')
+        elif part_mime.startswith('multipart/'):
+            result = _extract_email_body(part, base64_mod)
+            if result:
+                return result
+
+    if plain_text:
+        return plain_text
+    if html_text:
+        soup = BeautifulSoup(html_text, 'html.parser')
+        return soup.get_text(separator='\n', strip=True)
+    return ""
+
+
 def fetch_rss_feeds(feed_urls):
     """Fetch articles from RSS feeds, filtering to last 7 days"""
     from time import mktime
@@ -245,6 +356,15 @@ def fetch_news(article_history=None):
     if all_linkedin:
         print(f"Fetching from {len(all_linkedin)} LinkedIn top-content pages...")
         articles.extend(fetch_linkedin_top_content(list(all_linkedin)))
+
+    # Fetch from Gmail newsletters (if enabled)
+    if GMAIL_ENABLED:
+        all_gmail_labels = set()
+        for config in SHOWS.values():
+            all_gmail_labels.update(config.get('gmail_labels', []))
+        if all_gmail_labels:
+            print(f"Fetching from {len(all_gmail_labels)} Gmail labels...")
+            articles.extend(fetch_gmail_content(list(all_gmail_labels)))
 
     print(f"Total articles fetched: {len(articles)}")
 
@@ -448,8 +568,15 @@ def select_articles(articles):
             print(f"ERROR: Could not parse selection response. Raw response:\n{response_text[:500]}")
             return {}
 
-def generate_scripts(selected_urls):
+def generate_scripts(selected_urls, all_articles=None):
     """Second pass: Generate podcast scripts from full article content"""
+
+    # Build lookup for pre-fetched content (e.g., email articles)
+    prefetched = {}
+    if all_articles:
+        for article in all_articles:
+            if article.get("full_text"):
+                prefetched[article["link"]] = article["full_text"]
 
     # Fetch full content for selected articles
     print("Step 2: Fetching full article content...")
@@ -461,7 +588,7 @@ def generate_scripts(selected_urls):
         print(f"  {config.get('title', show_key)}: Fetching {len(urls)} articles...")
 
         for url in urls[:20]:  # Limit to 20 articles max
-            content = fetch_article_content(url)
+            content = prefetched.get(url) or fetch_article_content(url)
             if content:
                 articles_by_show[show_key].append({
                     "url": url,
@@ -776,7 +903,7 @@ def daily_podcast_entrypoint():
             return jsonify({"error": "Article selection failed"}), 500
 
         # 3. Generate scripts from full content
-        scripts_json = generate_scripts(selected_urls)
+        scripts_json = generate_scripts(selected_urls, all_articles=news_data)
 
         results = {}
 
