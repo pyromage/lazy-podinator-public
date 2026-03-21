@@ -22,6 +22,12 @@
       "hardware",
       "AI",
       "mobile"
+    ],
+    "interests": [
+      "major product launches and innovations",
+      "mergers, acquisitions, and funding rounds",
+      "technology breakthroughs and research milestones",
+      "regulatory changes with broad impact"
     ]
   },
   "my_topic_2": {
@@ -46,6 +52,12 @@
       "investment",
       "cryptocurrency",
       "stocks"
+    ],
+    "interests": [
+      "market-moving developments and earnings surprises",
+      "mergers, acquisitions, and strategic partnerships",
+      "major funding rounds and IPOs",
+      "regulatory and policy changes affecting markets"
     ]
   }
 }

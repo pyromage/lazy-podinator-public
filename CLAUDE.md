@@ -15,8 +15,14 @@ bandit -r main.py scripts/ test/ -ll
 pylint main.py scripts/setup_gmail.py --disable=C0114,C0115,C0116
 
 # 4. Markdown lint — fix all errors (ignore line-length)
-markdownlint README.md SETUP.md CONTRIBUTING.md CLAUDE.md artwork/README.md --disable MD013
+markdownlint README.md SETUP.md CLAUDE.md artwork/README.md --disable MD013
+
+# 5. Run tests — must pass before committing
+source .env && python test/test_local.py
 ```
+
+Test scripts call the Anthropic API so they require `ANTHROPIC_API_KEY`.
+The test generates output in `output/` — review the scripts for quality.
 
 ### Accepted pylint suppressions
 

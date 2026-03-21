@@ -39,8 +39,11 @@ def load_json_config(filename):
 SHOWS = load_json_config('shows_config.json')
 
 def fetch_rss_feeds(feed_urls):
-    """Fetch articles from RSS feeds"""
+    """Fetch articles from RSS feeds, filtering to last 7 days"""
+    from datetime import datetime, timedelta
+    from time import mktime
     articles = []
+    cutoff_date = datetime.now() - timedelta(days=7)
     print("\n📡 Fetching RSS feeds...")
 
     for url in feed_urls:
@@ -48,7 +51,15 @@ def fetch_rss_feeds(feed_urls):
             print(f"  - {url}")
             feed = feedparser.parse(url)
             count = 0
-            for entry in feed.entries[:6]:
+            for entry in feed.entries[:10]:
+                entry_date = None
+                for date_field in ('published_parsed', 'updated_parsed'):
+                    parsed = entry.get(date_field)
+                    if parsed:
+                        entry_date = datetime.fromtimestamp(mktime(parsed))
+                        break
+                if entry_date and entry_date < cutoff_date:
+                    continue
                 articles.append({
                     "title": entry.title,
                     "link": entry.link,
@@ -105,7 +116,12 @@ def select_articles(articles):
     show_list = []
     for key, config in SHOWS.items():
         keywords = ", ".join(config.get('keywords', []))
-        show_list.append(f"- '{config['title']}' (key: {key}, Focus: {keywords})")
+        interests = config.get('interests', [])
+        desc = f"- '{config['title']}' (key: {key}, Focus: {keywords})"
+        if interests:
+            interests_str = "; ".join(interests)
+            desc += f"\n      Prioritize: {interests_str}"
+        show_list.append(desc)
 
     shows_description = "\n    ".join(show_list)
 
@@ -117,6 +133,21 @@ def select_articles(articles):
     2. For EACH show, select up to 20 of the most relevant and interesting article URLs.
     3. Return ONLY the URLs that are worth covering, grouped by show.
 
+    Selection Criteria - PRIORITIZE stories about:
+    - Market-moving developments: significant funding rounds, major earnings, price movements
+    - New product launches and first-of-their-kind innovations
+    - Mergers, acquisitions, and strategic partnerships that reshape markets
+    - Technology breakthroughs: new capabilities, research milestones
+    - Regulatory changes with broad industry impact
+    - Each show also has its own priority criteria listed above — follow those
+
+    DEPRIORITIZE or SKIP:
+    - Opinion pieces and editorials (unless from a highly notable figure)
+    - Listicles ("Top 10...", "Best of...")
+    - Minor product updates or incremental version bumps
+    - Duplicate coverage of the same story from multiple sources (pick the best source)
+    - Promotional content or sponsored articles
+
     Return JSON format with keys matching the show keys (e.g., "stablecoin", "ai").
     Each value should be an array of URLs (strings) for that show.
     Example: {{"stablecoin": ["url1", "url2", ...], "ai": ["url3", "url4", ...]}}
@@ -125,7 +156,7 @@ def select_articles(articles):
     print("\n🔍 Step 1: Selecting top articles...")
     response = client.messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[
             {
                 "role": "user",

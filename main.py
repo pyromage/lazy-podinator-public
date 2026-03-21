@@ -50,6 +50,43 @@ def load_json_config(filename):
 
 SHOWS = load_json_config('shows_config.json')
 
+
+def load_article_history():
+    """Load previously covered article URLs from GCS."""
+    if not BUCKET_NAME or BUCKET_NAME == "local-testing":
+        return {"covered_urls": {}}
+    try:
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob("config/article_history.json")
+        history = json.loads(blob.download_as_text())
+        cutoff = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        history["covered_urls"] = {
+            url: date_str
+            for url, date_str in history.get("covered_urls", {}).items()
+            if date_str >= cutoff
+        }
+        print(f"Loaded article history: {len(history['covered_urls'])} previously covered URLs")
+        return history
+    except Exception:
+        print("No article history found (starting fresh)")
+        return {"covered_urls": {}}
+
+
+def save_article_history(history, new_urls):
+    """Save updated article history to GCS after successful pipeline run."""
+    if not BUCKET_NAME or BUCKET_NAME == "local-testing":
+        return
+    today = datetime.now().strftime('%Y-%m-%d')
+    for url in new_urls:
+        history["covered_urls"][url] = today
+    try:
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob("config/article_history.json")
+        blob.upload_from_string(json.dumps(history), content_type="application/json")
+        print(f"Article history saved: {len(history['covered_urls'])} total URLs tracked")
+    except Exception as e:
+        print(f"WARNING: Could not save article history: {e}")
+
 # Pronunciation guide for TTS
 _pronunciation_guide = None
 
@@ -156,14 +193,24 @@ def fetch_linkedin_top_content(urls):
 
 
 def fetch_rss_feeds(feed_urls):
-    """Fetch articles from RSS feeds"""
+    """Fetch articles from RSS feeds, filtering to last 7 days"""
+    from time import mktime
     articles = []
+    cutoff_date = datetime.now() - timedelta(days=7)
     print("Fetching RSS feeds...")
 
     for url in feed_urls:
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:6]:
+            for entry in feed.entries[:10]:
+                entry_date = None
+                for date_field in ('published_parsed', 'updated_parsed'):
+                    parsed = entry.get(date_field)
+                    if parsed:
+                        entry_date = datetime.fromtimestamp(mktime(parsed))
+                        break
+                if entry_date and entry_date < cutoff_date:
+                    continue
                 articles.append({
                     "title": entry.title,
                     "link": entry.link,
@@ -175,8 +222,8 @@ def fetch_rss_feeds(feed_urls):
 
     return articles
 
-def fetch_news():
-    """Ingests news from RSS feeds"""
+def fetch_news(article_history=None):
+    """Ingests news from RSS feeds, with optional deduplication against history"""
     articles = []
 
     # Aggregate feeds from all shows
@@ -200,6 +247,17 @@ def fetch_news():
         articles.extend(fetch_linkedin_top_content(list(all_linkedin)))
 
     print(f"Total articles fetched: {len(articles)}")
+
+    # Remove previously covered articles
+    if article_history and article_history.get("covered_urls"):
+        covered = article_history["covered_urls"]
+        before_count = len(articles)
+        articles = [a for a in articles if a.get("link") not in covered]
+        filtered_count = before_count - len(articles)
+        if filtered_count > 0:
+            print(f"Filtered out {filtered_count} previously covered articles")
+        print(f"Total articles after filtering: {len(articles)}")
+
     return articles
 
 def fetch_article_content(url):
@@ -322,7 +380,12 @@ def select_articles(articles):
     show_list = []
     for key, config in SHOWS.items():
         keywords = ", ".join(config.get('keywords', []))
-        show_list.append(f"- '{config['title']}' (key: {key}, Focus: {keywords})")
+        interests = config.get('interests', [])
+        desc = f"- '{config['title']}' (key: {key}, Focus: {keywords})"
+        if interests:
+            interests_str = "; ".join(interests)
+            desc += f"\n      Prioritize: {interests_str}"
+        show_list.append(desc)
 
     shows_description = "\n    ".join(show_list)
 
@@ -333,6 +396,21 @@ def select_articles(articles):
     1. Analyze the provided news headlines and snippets.
     2. For EACH show, select up to 20 of the most relevant and interesting article URLs.
     3. Return ONLY the URLs that are worth covering, grouped by show.
+
+    Selection Criteria - PRIORITIZE stories about:
+    - Market-moving developments: significant funding rounds, major earnings, price movements
+    - New product launches and first-of-their-kind innovations
+    - Mergers, acquisitions, and strategic partnerships that reshape markets
+    - Technology breakthroughs: new capabilities, research milestones
+    - Regulatory changes with broad industry impact
+    - Each show also has its own priority criteria listed above — follow those
+
+    DEPRIORITIZE or SKIP:
+    - Opinion pieces and editorials (unless from a highly notable figure)
+    - Listicles ("Top 10...", "Best of...")
+    - Minor product updates or incremental version bumps
+    - Duplicate coverage of the same story from multiple sources (pick the best source)
+    - Promotional content or sponsored articles
 
     Return JSON format with keys matching the show keys (e.g., "stablecoin", "ai").
     Each value should be an array of URLs (strings) for that show.
@@ -684,8 +762,11 @@ def update_podcast_feeds():
 def daily_podcast_entrypoint():
     """The Cloud Run Entry Point"""
     try:
+        # 0. Load article history for deduplication
+        article_history = load_article_history()
+
         # 1. Ingest
-        news_data = fetch_news()
+        news_data = fetch_news(article_history=article_history)
 
         # 2. Select top articles
         selected_urls = select_articles(news_data)
@@ -729,6 +810,12 @@ def daily_podcast_entrypoint():
 
         # 6. Update RSS feeds
         feed_urls = update_podcast_feeds()
+
+        # 7. Save article history after successful completion
+        all_covered_urls = []
+        for urls in selected_urls.values():
+            all_covered_urls.extend(urls)
+        save_article_history(article_history, all_covered_urls)
 
         return jsonify({
             "status": "success",
