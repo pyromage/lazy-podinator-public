@@ -4,4 +4,6 @@ feedparser
 google-cloud-storage
 requests
 google-auth>=2.0.0
+google-auth-oauthlib
+google-api-python-client
 beautifulsoup4>=4.12.0

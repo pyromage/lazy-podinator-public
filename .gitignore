@@ -48,7 +48,11 @@ venv.bak/
 service-account*.json
 credentials.json
 gmail_credentials.json
+client_secret_*.json
 gmail_token.json
+shows_config.json
+artwork/*.png
+artwork/*.jpg
 
 # Google Cloud
 .gcloud/

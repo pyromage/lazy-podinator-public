@@ -10,11 +10,9 @@ else
     exit 1
 fi
 
-# --- CONFIGURATION ---
-REGION="northamerica-northeast1"  # Montreal
-SERVICE_NAME="lazy-podinator"
+# --- CONFIGURATION (derived from .env) ---
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${SERVICE_NAME}:latest"
-# ---------------------
+# ------------------------------------------
 
 # Validate required variables
 if [ -z "$ANTHROPIC_API_KEY" ]; then
@@ -29,6 +27,16 @@ fi
 
 if [ -z "$BUCKET_NAME" ]; then
     echo "❌ Error: BUCKET_NAME not set in .env"
+    exit 1
+fi
+
+if [ -z "$REGION" ]; then
+    echo "❌ Error: REGION not set in .env"
+    exit 1
+fi
+
+if [ -z "$SERVICE_NAME" ]; then
+    echo "❌ Error: SERVICE_NAME not set in .env"
     exit 1
 fi
 
@@ -94,8 +102,8 @@ gcloud run deploy $SERVICE_NAME \
     --allow-unauthenticated \
     --memory=1Gi \
     --cpu=1 \
-    --timeout=1800s \
-    --set-env-vars BUCKET_NAME=$BUCKET_NAME,ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+    --timeout=3600s \
+    --set-env-vars BUCKET_NAME=$BUCKET_NAME,ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,CLAUDE_MODEL=$CLAUDE_MODEL,NOTIFY_EMAIL=$NOTIFY_EMAIL \
     --project=$PROJECT_ID
 
 echo ""

@@ -22,6 +22,8 @@ if not ANTHROPIC_API_KEY:
     print("  export ANTHROPIC_API_KEY='your-key-here'")
     exit(1)
 
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+
 # Initialize Anthropic client
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -122,7 +124,7 @@ def select_articles(articles):
 
     print("\n🔍 Step 1: Selecting top articles...")
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=CLAUDE_MODEL,
         max_tokens=4096,
         messages=[
             {
@@ -141,7 +143,7 @@ def select_articles(articles):
         if json_match:
             return json.loads(json_match.group(0))
         else:
-            print(f"ERROR: Could not parse selection response")
+            print("ERROR: Could not parse selection response")
             return {}
 
 def generate_scripts(selected_urls):
@@ -211,7 +213,7 @@ def generate_scripts(selected_urls):
 
     print("\n🤖 Step 3: Generating podcast scripts...")
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=CLAUDE_MODEL,
         max_tokens=16000,
         messages=[
             {
@@ -267,7 +269,7 @@ def main():
     print("\n" + "-" * 60)
     selected_urls = select_articles(articles)
 
-    print(f"\n📊 Articles selected:")
+    print("\n📊 Articles selected:")
     for show_key, urls in selected_urls.items():
         show_title = SHOWS.get(show_key, {}).get('title', show_key)
         print(f"  {show_title}: {len(urls)} articles")

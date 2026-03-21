@@ -2,6 +2,7 @@ import os
 import json
 import subprocess
 import tempfile
+import time
 import feedparser
 import anthropic
 import requests
@@ -20,6 +21,7 @@ app = Flask(__name__)
 anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 storage_client = storage.Client()
 BUCKET_NAME = os.environ.get("BUCKET_NAME")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
 
 # Piper configuration
 PIPER_PATH = "/app/piper/piper"
@@ -236,6 +238,83 @@ def fetch_article_content(url):
         print(f"Error fetching {url}: {e}")
         return ""
 
+def call_claude_with_retry(max_retries=3, **kwargs):
+    """Call Claude API with exponential backoff for transient errors.
+    Billing errors are surfaced immediately without retrying."""
+    for attempt in range(max_retries + 1):
+        try:
+            return anthropic_client.messages.create(**kwargs)
+        except anthropic.BadRequestError as e:
+            if "credit balance is too low" in str(e):
+                print("BILLING ERROR: Anthropic API credits depleted. "
+                      "Top up at console.anthropic.com/settings/billing")
+                send_failure_notification(
+                    subject="[Lazy Podinator] API credits depleted",
+                    body="The Anthropic API credit balance is too low. "
+                         "Please top up at console.anthropic.com/settings/billing.\n\n"
+                         f"Error: {e}"
+                )
+            raise
+        except (anthropic.RateLimitError, anthropic.APIStatusError,
+                anthropic.APIConnectionError, anthropic.APITimeoutError) as e:
+            if attempt == max_retries:
+                raise
+            wait = 2 ** attempt  # 1s, 2s, 4s
+            print(f"API error (attempt {attempt+1}/{max_retries+1}): {e}. Retrying in {wait}s...")
+            time.sleep(wait)
+
+
+def get_gmail_service():
+    """Load Gmail OAuth token from GCS and return an authenticated Gmail API service."""
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+
+    blob = storage_client.bucket(BUCKET_NAME).blob("config/gmail_token.json")
+    token_data = json.loads(blob.download_as_string())
+
+    creds = Credentials(
+        token=token_data.get("token"),
+        refresh_token=token_data.get("refresh_token"),
+        token_uri=token_data.get("token_uri"),
+        client_id=token_data.get("client_id"),
+        client_secret=token_data.get("client_secret"),
+        scopes=token_data.get("scopes"),
+    )
+
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        token_data.update({
+            "token": creds.token,
+            "refresh_token": creds.refresh_token,
+        })
+        blob.upload_from_string(json.dumps(token_data), content_type="application/json")
+
+    return build("gmail", "v1", credentials=creds)
+
+
+def send_failure_notification(subject, body):
+    """Send a failure alert email via Gmail API. Silently skips if not configured."""
+    import base64
+    from email.mime.text import MIMEText
+
+    email = os.environ.get("NOTIFY_EMAIL")
+    if not email:
+        return
+
+    try:
+        service = get_gmail_service()
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = email
+        msg["To"] = email
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        service.users().messages().send(userId="me", body={"raw": raw}).execute()
+        print(f"Failure notification sent to {email}")
+    except Exception as e:
+        print(f"WARNING: Could not send failure notification: {e}")
+
+
 def select_articles(articles):
     """First pass: Claude selects the most interesting articles for each show"""
 
@@ -261,8 +340,8 @@ def select_articles(articles):
     Do not include any text before or after the JSON object."""
 
     print("Step 1: Selecting top articles...")
-    response = anthropic_client.messages.create(
-        model="claude-sonnet-4-6",
+    response = call_claude_with_retry(
+        model=CLAUDE_MODEL,
         max_tokens=8192,
         messages=[
             {
@@ -362,8 +441,8 @@ def generate_scripts(selected_urls):
     Do not include any text before or after the JSON object."""
 
     print("Step 3: Generating podcast scripts...")
-    response = anthropic_client.messages.create(
-        model="claude-sonnet-4-6",
+    response = call_claude_with_retry(
+        model=CLAUDE_MODEL,
         max_tokens=16000,
         messages=[
             {
@@ -620,18 +699,28 @@ def daily_podcast_entrypoint():
 
         results = {}
 
-        # 4. Production Loop
-        for show_key, config in SHOWS.items():
+        # 4. Generate audio in parallel (each show ~16 min sequentially)
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def produce_show(show_key, config):
             script_key = f"{show_key}_script"
-
-            if script_key in scripts_json:
-                print(f"Generating audio for {config['title']}...")
-                audio_data = generate_audio(scripts_json[script_key], config['voice'], show_key=show_key)
-
-                public_url = upload_to_bucket(audio_data, show_key)
-                results[show_key] = public_url
-            else:
+            if script_key not in scripts_json:
                 print(f"No script generated for {show_key}")
+                return show_key, None
+            print(f"Generating audio for {config['title']}...")
+            audio_data = generate_audio(scripts_json[script_key], config['voice'], show_key=show_key)
+            public_url = upload_to_bucket(audio_data, show_key)
+            return show_key, public_url
+
+        with ThreadPoolExecutor(max_workers=len(SHOWS)) as executor:
+            futures = {
+                executor.submit(produce_show, key, cfg): key
+                for key, cfg in SHOWS.items()
+            }
+            for future in as_completed(futures):
+                show_key, url = future.result()
+                if url:
+                    results[show_key] = url
 
         # 5. Cleanup old episodes (older than 30 days)
         print("Cleaning up episodes older than 30 days...")
@@ -652,6 +741,10 @@ def daily_podcast_entrypoint():
         error_details = traceback.format_exc()
         print(f"Error occurred: {e}")
         print(f"Full traceback:\n{error_details}")
+        send_failure_notification(
+            subject="[Lazy Podinator] Pipeline failed",
+            body=f"The daily podcast pipeline failed with the following error:\n\n{e}\n\n{error_details}"
+        )
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":

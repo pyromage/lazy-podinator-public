@@ -75,7 +75,7 @@ def generate_audio(script_text, voice_model, output_filename, show_key=None):
         script_text = apply_pronunciation_fixes(script_text, show_key=show_key)
 
         # Run Piper to generate WAV
-        process = subprocess.run(
+        subprocess.run(
             [
                 PIPER_PATH,
                 "--model", model_path,
@@ -90,7 +90,7 @@ def generate_audio(script_text, voice_model, output_filename, show_key=None):
         print(f"  ✅ WAV generated: {wav_path}")
 
         # Convert WAV to MP3 using ffmpeg
-        print(f"  🔄 Converting to MP3...")
+        print("  🔄 Converting to MP3...")
         subprocess.run(
             [
                 "ffmpeg", "-y", "-loglevel", "error",

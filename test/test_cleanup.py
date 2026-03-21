@@ -140,10 +140,10 @@ def main():
     actual_remaining = len(episodes_after)
 
     if actual_remaining == expected_remaining:
-        print(f"✅ SUCCESS: Cleanup working correctly!")
+        print("✅ SUCCESS: Cleanup working correctly!")
         print(f"   Expected {expected_remaining} episodes remaining, found {actual_remaining}")
     else:
-        print(f"❌ FAILURE: Unexpected results")
+        print("❌ FAILURE: Unexpected results")
         print(f"   Expected {expected_remaining} episodes remaining, found {actual_remaining}")
 
     # Step 6: Clean up test data
