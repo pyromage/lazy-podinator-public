@@ -3,7 +3,7 @@
 import os
 import json
 
-from config import storage_client, BUCKET_NAME
+from config import get_storage_client, BUCKET_NAME
 
 
 def get_gmail_service():
@@ -12,7 +12,7 @@ def get_gmail_service():
     from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
 
-    blob = storage_client.bucket(BUCKET_NAME).blob("config/gmail_token.json")
+    blob = get_storage_client().bucket(BUCKET_NAME).blob("config/gmail_token.json")
     token_data = json.loads(blob.download_as_string())
 
     creds = Credentials(

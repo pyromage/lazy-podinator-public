@@ -9,8 +9,17 @@ import anthropic
 
 # Initialize Clients
 anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-storage_client = storage.Client()
 BUCKET_NAME = os.environ.get("BUCKET_NAME")
+
+# Lazy-initialize storage client (avoids crash when GCP credentials not available)
+_storage_client = None
+
+
+def get_storage_client():
+    global _storage_client
+    if _storage_client is None:
+        _storage_client = storage.Client()
+    return _storage_client
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
 GMAIL_ENABLED = os.environ.get("GMAIL_ENABLED", "").lower() == "true"
 
@@ -24,7 +33,7 @@ def load_json_config(filename):
     if BUCKET_NAME and BUCKET_NAME != "local-testing":
         try:
             print(f"Loading {filename} from GCS bucket: {BUCKET_NAME}")
-            bucket = storage_client.bucket(BUCKET_NAME)
+            bucket = get_storage_client().bucket(BUCKET_NAME)
             blob = bucket.blob(f"config/{filename}")
             config_json = blob.download_as_text()
             print(f"✓ Loaded {filename} from GCS")
@@ -46,7 +55,7 @@ def load_article_history():
     if not BUCKET_NAME or BUCKET_NAME == "local-testing":
         return {"covered_urls": {}}
     try:
-        bucket = storage_client.bucket(BUCKET_NAME)
+        bucket = get_storage_client().bucket(BUCKET_NAME)
         blob = bucket.blob("config/article_history.json")
         history = json.loads(blob.download_as_text())
         cutoff = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -70,7 +79,7 @@ def save_article_history(history, new_urls):
     for url in new_urls:
         history["covered_urls"][url] = today
     try:
-        bucket = storage_client.bucket(BUCKET_NAME)
+        bucket = get_storage_client().bucket(BUCKET_NAME)
         blob = bucket.blob("config/article_history.json")
         blob.upload_from_string(json.dumps(history), content_type="application/json")
         print(f"Article history saved: {len(history['covered_urls'])} total URLs tracked")

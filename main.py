@@ -1,6 +1,5 @@
 """Lazy Podinator — Flask app and pipeline orchestration."""
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, jsonify
 
 from config import SHOWS, load_article_history, save_article_history
@@ -35,28 +34,18 @@ def daily_podcast_entrypoint():
 
         results = {}
 
-        # 4. Generate audio in parallel
-        def produce_show(show_key, config):
+        # 4. Generate audio sequentially (Piper TTS is memory-intensive)
+        for show_key, config in SHOWS.items():
             script_key = f"{show_key}_script"
             if script_key not in scripts_json:
                 print(f"No script generated for {show_key}")
-                return show_key, None
+                continue
             print(f"Generating audio for {config['title']}...")
             audio_data = generate_audio(
                 scripts_json[script_key], config['voice'], show_key=show_key
             )
             public_url = upload_to_bucket(audio_data, show_key)
-            return show_key, public_url
-
-        with ThreadPoolExecutor(max_workers=len(SHOWS)) as executor:
-            futures = {
-                executor.submit(produce_show, key, cfg): key
-                for key, cfg in SHOWS.items()
-            }
-            for future in as_completed(futures):
-                show_key, url = future.result()
-                if url:
-                    results[show_key] = url
+            results[show_key] = public_url
 
         # 5. Cleanup old episodes (older than 30 days)
         print("Cleaning up episodes older than 30 days...")

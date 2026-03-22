@@ -5,7 +5,7 @@ from email.utils import formatdate
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom import minidom
 
-from config import storage_client, BUCKET_NAME, SHOWS
+from config import get_storage_client, BUCKET_NAME, SHOWS
 
 
 def upload_to_bucket(audio_bytes, show_key):
@@ -13,7 +13,7 @@ def upload_to_bucket(audio_bytes, show_key):
     date_str = datetime.now().strftime('%Y-%m-%d')
     filename = f"{show_key}/{date_str}_update.mp3"
 
-    bucket = storage_client.bucket(BUCKET_NAME)
+    bucket = get_storage_client().bucket(BUCKET_NAME)
     blob = bucket.blob(filename)
     blob.upload_from_string(audio_bytes, content_type="audio/mpeg")
 
@@ -23,7 +23,7 @@ def upload_to_bucket(audio_bytes, show_key):
 
 def cleanup_old_episodes(show_key, days_to_keep=30):
     """Delete podcast episodes older than specified days from GCS"""
-    bucket = storage_client.bucket(BUCKET_NAME)
+    bucket = get_storage_client().bucket(BUCKET_NAME)
     blobs = bucket.list_blobs(prefix=f"{show_key}/")
 
     cutoff_date = datetime.now() - timedelta(days=days_to_keep)
@@ -50,7 +50,7 @@ def cleanup_old_episodes(show_key, days_to_keep=30):
 
 def get_existing_episodes(show_key):
     """Get list of existing episodes from GCS bucket (last 30 days only)"""
-    bucket = storage_client.bucket(BUCKET_NAME)
+    bucket = get_storage_client().bucket(BUCKET_NAME)
     blobs = bucket.list_blobs(prefix=f"{show_key}/")
 
     cutoff_date = datetime.now() - timedelta(days=30)
@@ -136,7 +136,7 @@ def update_podcast_feeds():
             print(f"Generating RSS feed for {config['title']}...")
             rss_xml = generate_podcast_rss(show_key, config)
 
-            bucket = storage_client.bucket(BUCKET_NAME)
+            bucket = get_storage_client().bucket(BUCKET_NAME)
             blob = bucket.blob(f"{show_key}/feed.xml")
             blob.upload_from_string(rss_xml, content_type="application/xml")
 

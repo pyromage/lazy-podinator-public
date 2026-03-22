@@ -1,8 +1,9 @@
 # Use Python slim image for smaller size
 FROM python:3.11-slim
 
-# Set environment variables for Python
+# Set environment variables
 ENV PYTHONUNBUFFERED=1
+ENV LD_LIBRARY_PATH=/app/piper
 
 # Set working directory
 WORKDIR /app
@@ -13,9 +14,13 @@ RUN apt-get update && apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install Piper TTS binary
+# Download and install Piper TTS binary (auto-detect architecture)
 RUN mkdir -p /app/piper && \
-    wget -q https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz -O /tmp/piper.tar.gz && \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then PIPER_ARCH="arm64"; \
+    else PIPER_ARCH="amd64"; fi && \
+    wget -q https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_${PIPER_ARCH}.tar.gz \
+        -O /tmp/piper.tar.gz && \
     tar -xzf /tmp/piper.tar.gz -C /app/piper --strip-components=1 && \
     rm /tmp/piper.tar.gz && \
     chmod +x /app/piper/piper
