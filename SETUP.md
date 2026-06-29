@@ -142,7 +142,54 @@ chmod +x scripts/deploy.sh
 
 This builds the Docker container, uploads config and artwork, and deploys to Cloud Run.
 
-## 7. Schedule Daily Runs
+> **Note on Cloud Run + Kokoro:** Cloud Run caps a request at 60 minutes. With
+> Kokoro TTS on 2 vCPU, three ~10-minute episodes take longer than that, so the
+> scheduled HTTP run will time out. Use the GitHub Actions path below (free,
+> 4-vCPU runners, no 60-minute cap), or set `TTS_ENGINE=piper` for Cloud Run.
+
+## Free Daily Runs via GitHub Actions (recommended)
+
+Standard GitHub-hosted runners are **free and unlimited on public repositories**
+(4 vCPU, 6-hour job limit), which comfortably fits a full Kokoro run. The
+workflow ([.github/workflows/daily.yml](.github/workflows/daily.yml)) reads
+config from GCS and publishes episodes/feeds to GCS — the same data flow as
+Cloud Run — so no container or Cloud Run service is needed.
+
+1. **Create a service account** with write access to your bucket and a JSON key:
+
+   ```bash
+   gcloud iam service-accounts create podinator-ci \
+     --display-name="Podinator GitHub Actions" --project=$PROJECT_ID
+   gcloud storage buckets add-iam-policy-binding gs://$BUCKET_NAME \
+     --member="serviceAccount:podinator-ci@$PROJECT_ID.iam.gserviceaccount.com" \
+     --role="roles/storage.objectAdmin"
+   gcloud iam service-accounts keys create key.json \
+     --iam-account=podinator-ci@$PROJECT_ID.iam.gserviceaccount.com
+   ```
+
+2. **Add repository secrets** (public repo → Settings → Secrets and variables →
+   Actions). Do **not** commit these:
+
+   | Secret | Value |
+   | --- | --- |
+   | `GCP_SA_KEY` | full contents of `key.json` |
+   | `ANTHROPIC_API_KEY` | your Anthropic API key |
+   | `BUCKET_NAME` | your GCS bucket name |
+   | `NOTIFY_EMAIL` | failure-notification address (optional) |
+
+   Then delete the local key: `rm key.json`.
+
+3. **Edit the repo guard** in `daily.yml` (`github.repository == '...'`) to your
+   public repo's `owner/name`, and adjust the `cron` time (UTC) if desired.
+
+The workflow runs daily and can be triggered manually from the **Actions** tab.
+
+> Caveats: scheduled workflows are auto-disabled after 60 days of repo
+> inactivity (push or re-enable to resume), and run in UTC. Failure emails
+> require the Gmail setup below; otherwise a failed run still shows in the
+> Actions tab.
+
+## 7. Schedule Daily Runs (Cloud Run)
 
 ```bash
 gcloud scheduler jobs create http daily-pod-trigger \
