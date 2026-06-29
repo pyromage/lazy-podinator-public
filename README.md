@@ -1,13 +1,13 @@
 # Lazy Podinator
 
-Serverless automation engine that turns RSS feeds into daily AI-hosted podcasts. Every morning it ingests headlines, uses Claude to select and script the top stories, generates audio with Piper TTS, and publishes a podcast-ready RSS feed.
+Serverless automation engine that turns RSS feeds into daily AI-hosted podcasts. Every morning it ingests headlines, uses Claude to select and script the top stories, generates audio with Kokoro TTS, and publishes a podcast-ready RSS feed.
 
 ## How It Works
 
 1. **Ingests** headlines from RSS feeds and LinkedIn top-content pages
 2. **Selects** up to 20 relevant topics per show using Claude AI
 3. **Scripts** a ~30-second discussion per topic (~10 min total)
-4. **Generates** audio using Piper TTS (free, open-source)
+4. **Generates** audio using Kokoro TTS (free, open-source; Piper available as a fallback)
 5. **Publishes** MP3 + RSS feed to Google Cloud Storage
 6. **Delivers** via Spotify, Apple Podcasts, or any podcast app
 
@@ -17,7 +17,7 @@ Serverless automation engine that turns RSS feeds into daily AI-hosted podcasts.
 - **Trigger:** Google Cloud Scheduler (daily cron)
 - **Storage:** Google Cloud Storage
 - **AI:** Anthropic Claude API
-- **TTS:** Piper TTS (bundled in container)
+- **TTS:** Kokoro TTS by default, Piper as fallback (both bundled in container, set via `TTS_ENGINE`)
 - **Notifications:** Gmail API (failure alerts)
 
 ## Quick Start

@@ -34,7 +34,7 @@ def daily_podcast_entrypoint():
 
         results = {}
 
-        # 4. Generate audio sequentially (Piper TTS is memory-intensive)
+        # 4. Generate audio sequentially (TTS is memory-intensive)
         for show_key, config in SHOWS.items():
             script_key = f"{show_key}_script"
             if script_key not in scripts_json:

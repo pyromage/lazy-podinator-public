@@ -46,21 +46,28 @@ Edit `shows_config.json` to define your podcasts. Each show needs:
 | `email` | Contact email (required by podcast directories) |
 | `category` | News, Technology, Business, Science, etc. |
 | `artwork` | Cover image URL (1400x1400 to 3000x3000 px) |
-| `voice` | Piper TTS voice model |
+| `voice` | TTS voice (Piper name; auto-mapped to a Kokoro voice when `TTS_ENGINE=kokoro`) |
 | `duration` | Estimated duration in seconds ("600" = 10 min) |
 | `feeds` | Array of RSS feed URLs |
 | `keywords` | Array of topic keywords for AI selection |
 
 See `shows_config.example.json` for a template.
 
-### Available Piper Voices
+### Voices
 
-- `en_US-ryan-high` — deep male voice
-- `en_US-amy-medium` — energetic female voice
-- `en_US-lessac-medium` — neutral, clear voice
-- `en_GB-alan-medium` — British male voice
+The `voice` field accepts Piper voice-model names. When `TTS_ENGINE=kokoro`
+(the default), these are auto-mapped to Kokoro voices:
 
-Full list: <https://rhasspy.github.io/piper-samples/>
+| `voice` value | Description | Kokoro voice |
+| --- | --- | --- |
+| `en_US-ryan-high` | deep, authoritative male | `am_michael` |
+| `en_US-amy-medium` | energetic female | `af_heart` |
+
+To use a Kokoro voice directly, put its native name (e.g. `am_adam`,
+`af_bella`) in the `voice` field — unmapped values are passed through as-is.
+
+- Piper voice list: <https://rhasspy.github.io/piper-samples/>
+- Kokoro voice list: <https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md>
 
 ## 3. Test Locally
 
@@ -182,6 +189,9 @@ gcloud run services logs read $SERVICE_NAME --region=$REGION --limit=100
 # Test a single RSS feed
 python -c "import feedparser; print(len(feedparser.parse('URL').entries))"
 
-# Test Piper TTS directly
+# Test Kokoro TTS directly (default engine)
+python -c "import soundfile as sf; from kokoro_onnx import Kokoro; k = Kokoro('/app/kokoro/kokoro-v1.0.int8.onnx', '/app/kokoro/voices-v1.0.bin'); s, r = k.create('test', voice='am_michael', lang='en-us'); sf.write('test.wav', s, r)"
+
+# Test Piper TTS directly (fallback engine)
 echo "test" | ./piper/piper --model ./piper/models/en_US-ryan-high.onnx --output_file test.wav
 ```

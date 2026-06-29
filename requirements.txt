@@ -1,5 +1,5 @@
 flask>=3.0.0
-anthropic>=0.34.0
+anthropic>=0.76.0
 feedparser
 google-cloud-storage
 requests
@@ -7,3 +7,5 @@ google-auth>=2.0.0
 google-auth-oauthlib
 google-api-python-client
 beautifulsoup4>=4.12.0
+kokoro-onnx>=0.5.0
+soundfile>=0.12.0

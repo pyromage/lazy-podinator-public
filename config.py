@@ -23,7 +23,18 @@ def get_storage_client():
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
 GMAIL_ENABLED = os.environ.get("GMAIL_ENABLED", "").lower() == "true"
 
-# Piper configuration
+# Text-to-speech engine: "kokoro" (default, higher quality) or "piper" (fallback)
+TTS_ENGINE = os.environ.get("TTS_ENGINE", "kokoro").lower()
+
+# Kokoro configuration (default engine). The int8 model is CPU-optimized and
+# keeps the memory footprint small; point KOKORO_MODEL_PATH at a higher-precision
+# variant (fp16/full) if you have more RAM and want maximum quality.
+KOKORO_MODEL_PATH = os.environ.get(
+    "KOKORO_MODEL_PATH", "/app/kokoro/kokoro-v1.0.int8.onnx")
+KOKORO_VOICES_PATH = os.environ.get(
+    "KOKORO_VOICES_PATH", "/app/kokoro/voices-v1.0.bin")
+
+# Piper configuration (fallback engine)
 PIPER_PATH = "/app/piper/piper"
 MODELS_PATH = "/app/piper/models"
 
