@@ -155,31 +155,50 @@ workflow ([.github/workflows/daily.yml](.github/workflows/daily.yml)) reads
 config from GCS and publishes episodes/feeds to GCS — the same data flow as
 Cloud Run — so no container or Cloud Run service is needed.
 
-1. **Create a service account** with write access to your bucket and a JSON key:
+Authentication uses **Workload Identity Federation** (keyless GitHub OIDC → GCP)
+— no service-account JSON key, which many orgs disable by policy.
+
+1. **Create a service account** with write access to your bucket:
 
    ```bash
+   REPO="<owner>/<repo>"   # your public repo
+   SA="podinator-ci@$PROJECT_ID.iam.gserviceaccount.com"
+   NUM=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+
    gcloud iam service-accounts create podinator-ci \
      --display-name="Podinator GitHub Actions" --project=$PROJECT_ID
    gcloud storage buckets add-iam-policy-binding gs://$BUCKET_NAME \
-     --member="serviceAccount:podinator-ci@$PROJECT_ID.iam.gserviceaccount.com" \
-     --role="roles/storage.objectAdmin"
-   gcloud iam service-accounts keys create key.json \
-     --iam-account=podinator-ci@$PROJECT_ID.iam.gserviceaccount.com
+     --member="serviceAccount:$SA" --role="roles/storage.objectAdmin"
    ```
 
-2. **Add repository secrets** (public repo → Settings → Secrets and variables →
-   Actions). Do **not** commit these:
+2. **Set up Workload Identity Federation**, scoped to your repo:
+
+   ```bash
+   gcloud iam workload-identity-pools create github-pool \
+     --project=$PROJECT_ID --location=global --display-name="GitHub Actions"
+   gcloud iam workload-identity-pools providers create-oidc github-provider \
+     --project=$PROJECT_ID --location=global --workload-identity-pool=github-pool \
+     --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+     --attribute-condition="assertion.repository=='$REPO'" \
+     --issuer-uri="https://token.actions.githubusercontent.com"
+   gcloud iam service-accounts add-iam-policy-binding $SA --project=$PROJECT_ID \
+     --role="roles/iam.workloadIdentityUser" \
+     --member="principalSet://iam.googleapis.com/projects/$NUM/locations/global/workloadIdentityPools/github-pool/attribute.repository/$REPO"
+   ```
+
+3. **Add repository secrets** (public repo → Settings → Secrets and variables →
+   Actions). None are private keys, but keeping them out of the public YAML avoids
+   hardcoding project-specific values:
 
    | Secret | Value |
    | --- | --- |
-   | `GCP_SA_KEY` | full contents of `key.json` |
+   | `GCP_WIF_PROVIDER` | `projects/$NUM/locations/global/workloadIdentityPools/github-pool/providers/github-provider` |
+   | `GCP_SA_EMAIL` | `podinator-ci@$PROJECT_ID.iam.gserviceaccount.com` |
    | `ANTHROPIC_API_KEY` | your Anthropic API key |
    | `BUCKET_NAME` | your GCS bucket name |
    | `NOTIFY_EMAIL` | failure-notification address (optional) |
 
-   Then delete the local key: `rm key.json`.
-
-3. **Edit the repo guard** in `daily.yml` (`github.repository == '...'`) to your
+4. **Edit the repo guard** in `daily.yml` (`github.repository == '...'`) to your
    public repo's `owner/name`, and adjust the `cron` time (UTC) if desired.
 
 The workflow runs daily and can be triggered manually from the **Actions** tab.
