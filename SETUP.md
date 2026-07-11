@@ -74,16 +74,22 @@ To use a Kokoro voice directly, put its native name (e.g. `am_adam`,
 ```bash
 source .env
 
-# Generate scripts only (no audio)
+# Generate scripts only (no audio) — quickest check
 python test/test_local.py
 
-# Test audio with Docker (recommended, matches production)
-chmod +x test/test_audio_docker.sh
-./test/test_audio_docker.sh
-
-# Play the output
-afplay output/stablecoin_podcast.mp3
+# Test Kokoro audio locally (default engine): download the model, then
+# synthesize a sample through the real pipeline
+./scripts/setup_kokoro.sh
+export TTS_ENGINE=kokoro
+export KOKORO_MODEL_PATH=./kokoro/kokoro-v1.0.int8.onnx
+export KOKORO_VOICES_PATH=./kokoro/voices-v1.0.bin
+mkdir -p output
+python -c "from audio import generate_audio; open('output/test.mp3','wb').write(generate_audio('Hello from Kokoro.', 'am_michael'))"
+afplay output/test.mp3
 ```
+
+> The Docker/macOS audio test scripts under `test/` target the Piper fallback
+> engine; use the Kokoro steps above to test the default engine.
 
 ## 4. GCP Setup
 

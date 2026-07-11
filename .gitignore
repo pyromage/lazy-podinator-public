@@ -93,3 +93,6 @@ output/
 
 # Piper TTS (local testing)
 piper/
+
+# Kokoro TTS model (local testing)
+kokoro/

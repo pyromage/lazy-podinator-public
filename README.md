@@ -13,8 +13,8 @@ Serverless automation engine that turns RSS feeds into daily AI-hosted podcasts.
 
 ## Stack
 
-- **Compute:** Google Cloud Run (Docker)
-- **Trigger:** Google Cloud Scheduler (daily cron)
+- **Compute:** GitHub Actions (free unlimited minutes on public repos) — Cloud Run (Docker) optional
+- **Trigger:** Scheduled GitHub Actions workflow (daily cron) — Cloud Scheduler optional
 - **Storage:** Google Cloud Storage
 - **AI:** Anthropic Claude API
 - **TTS:** Kokoro TTS by default, Piper as fallback (both bundled in container, set via `TTS_ENGINE`)
@@ -38,7 +38,7 @@ source .env && python test/test_local.py
 
 ## Cost
 
-Designed to run within GCP's free tier. Anthropic API usage is ~$0.50-$2.00/month depending on number of shows.
+Runs for free on GitHub Actions (unlimited minutes for public repos), with GCS storage within the free tier. The only recurring cost is Anthropic API usage, ~$0.50-$2.00/month depending on number of shows.
 
 ## License
 

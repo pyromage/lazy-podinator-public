@@ -94,7 +94,9 @@ echo "================================================"
 echo "Step 4: Deploying to Cloud Run"
 echo "================================================"
 
-# Deploy the pre-built image to Cloud Run
+# Deploy the pre-built image to Cloud Run. Cloud Run uses Piper (TTS_ENGINE=piper)
+# because Kokoro's synthesis time exceeds Cloud Run's 60-minute request cap on
+# 2 vCPU — use the GitHub Actions workflow for Kokoro (see SETUP.md).
 gcloud run deploy $SERVICE_NAME \
     --image=$IMAGE \
     --region=$REGION \
@@ -103,7 +105,7 @@ gcloud run deploy $SERVICE_NAME \
     --memory=2Gi \
     --cpu=2 \
     --timeout=3600s \
-    --set-env-vars BUCKET_NAME=$BUCKET_NAME,ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,CLAUDE_MODEL=$CLAUDE_MODEL,NOTIFY_EMAIL=$NOTIFY_EMAIL \
+    --set-env-vars BUCKET_NAME=$BUCKET_NAME,ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,CLAUDE_MODEL=$CLAUDE_MODEL,NOTIFY_EMAIL=$NOTIFY_EMAIL,TTS_ENGINE=piper \
     --project=$PROJECT_ID
 
 echo ""

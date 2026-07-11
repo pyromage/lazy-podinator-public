@@ -49,7 +49,14 @@ This is a public repo meant for others to fork and use. Follow these rules:
 
 ## Project Structure
 
-- `main.py` — all application logic (Flask + pipeline)
+- `main.py` — Flask app + `run_pipeline()` orchestration (`python main.py run` for CI/cron)
+- `config.py` — shared config, clients, GCS config/history helpers
+- `ingestion.py` — RSS + newsletter fetching
+- `selection.py` — Claude article selection and script generation
+- `audio.py` — TTS (Kokoro default, Piper fallback), pronunciation fixes, MP3 conversion
+- `publishing.py` — GCS upload, episode cleanup, RSS feed generation
+- `notifications.py` — Gmail failure notifications
+- `.github/workflows/` — daily pipeline (GitHub Actions) + auto-retry on failure
 - `scripts/` — deployment and setup scripts
 - `test/` — testing scripts (not pytest, run directly)
 - `shows_config.json` — personal config (gitignored)
@@ -58,7 +65,8 @@ This is a public repo meant for others to fork and use. Follow these rules:
 ## Environment
 
 - Python 3.11+
-- Deployed to Google Cloud Run (Docker)
+- Runs daily via GitHub Actions (free public-repo runners); Cloud Run (Docker) optional
+- Publishes to Google Cloud Storage; `shows_config.json` loaded from GCS at runtime
 - GCP project: uses `PROJECT_ID` from `.env`
 - All secrets in `.env` (gitignored) — never hardcode credentials
 
