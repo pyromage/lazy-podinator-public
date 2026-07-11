@@ -2,10 +2,16 @@
 
 from datetime import datetime, timedelta
 from email.utils import formatdate
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree.ElementTree import Element, SubElement, tostring, register_namespace
 from xml.dom import minidom
 
 from config import get_storage_client, BUCKET_NAME, SHOWS
+
+# Register the itunes prefix so tags serialize as <itunes:image> etc. Without
+# this, ElementTree emits <ns0:image>, which Apple/Spotify parsers ignore —
+# breaking cover art, category, owner email, and the explicit flag.
+ITUNES_NS = 'http://www.itunes.com/dtds/podcast-1.0.dtd'
+register_namespace('itunes', ITUNES_NS)
 
 
 def upload_to_bucket(audio_bytes, show_key):
@@ -95,8 +101,6 @@ def generate_podcast_rss(show_key, config):
 
     rss = Element('rss')
     rss.set('version', '2.0')
-    rss.set('xmlns:itunes', 'http://www.itunes.com/dtds/podcast-1.0.dtd')
-    rss.set('xmlns:content', 'http://purl.org/rss/1.0/modules/content/')
 
     channel = SubElement(rss, 'channel')
 
