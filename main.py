@@ -10,7 +10,10 @@ from config import SHOWS, load_article_history, save_article_history
 from ingestion import fetch_news
 from selection import select_articles, generate_scripts
 from audio import generate_audio
-from publishing import upload_to_bucket, cleanup_old_episodes, update_podcast_feeds
+from publishing import (
+    upload_to_bucket, cleanup_old_episodes, update_podcast_feeds,
+    existing_episode_url_today,
+)
 from notifications import send_failure_notification
 
 app = Flask(__name__)
@@ -38,11 +41,18 @@ def run_pipeline():
 
     results = {}
 
-    # 4. Generate audio sequentially (TTS is memory-intensive)
+    # 4. Generate audio sequentially (TTS is memory-intensive).
+    #    Skip shows already generated today so a re-run after a mid-pipeline
+    #    failure only regenerates the missing show(s).
     for show_key, show_cfg in SHOWS.items():
         script_key = f"{show_key}_script"
         if script_key not in scripts_json:
             print(f"No script generated for {show_key}")
+            continue
+        existing_url = existing_episode_url_today(show_key)
+        if existing_url:
+            print(f"Skipping {show_cfg['title']} — today's episode already exists")
+            results[show_key] = existing_url
             continue
         print(f"Generating audio for {show_cfg['title']}...")
         audio_data = generate_audio(

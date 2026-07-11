@@ -21,6 +21,20 @@ def upload_to_bucket(audio_bytes, show_key):
     return public_url
 
 
+def existing_episode_url_today(show_key):
+    """Return the public URL of today's episode if it already exists, else None.
+
+    Enables idempotent re-runs: a retry skips shows already generated today,
+    so recovery from a mid-run failure only regenerates the missing show(s).
+    """
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    filename = f"{show_key}/{date_str}_update.mp3"
+    blob = get_storage_client().bucket(BUCKET_NAME).blob(filename)
+    if blob.exists():
+        return f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
+    return None
+
+
 def cleanup_old_episodes(show_key, days_to_keep=30):
     """Delete podcast episodes older than specified days from GCS"""
     bucket = get_storage_client().bucket(BUCKET_NAME)

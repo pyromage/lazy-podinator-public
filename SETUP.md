@@ -202,6 +202,9 @@ Authentication uses **Workload Identity Federation** (keyless GitHub OIDC → GC
    public repo's `owner/name`, and adjust the `cron` time (UTC) if desired.
 
 The workflow runs daily and can be triggered manually from the **Actions** tab.
+If a run fails (e.g. the hosted runner dies mid-run), `retry.yml` reruns it once
+on a fresh runner; because show generation is idempotent, the rerun only
+regenerates the show(s) still missing for the day.
 
 > Caveats: scheduled workflows are auto-disabled after 60 days of repo
 > inactivity (push or re-enable to resume), and run in UTC. Failure emails
