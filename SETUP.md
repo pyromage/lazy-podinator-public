@@ -77,19 +77,17 @@ source .env
 # Generate scripts only (no audio) — quickest check
 python test/test_local.py
 
-# Test Kokoro audio locally (default engine): download the model, then
-# synthesize a sample through the real pipeline
+# Generate audio from those scripts via the real pipeline (Kokoro default)
 ./scripts/setup_kokoro.sh
 export TTS_ENGINE=kokoro
 export KOKORO_MODEL_PATH=./kokoro/kokoro-v1.0.int8.onnx
 export KOKORO_VOICES_PATH=./kokoro/voices-v1.0.bin
-mkdir -p output
-python -c "from audio import generate_audio; open('output/test.mp3','wb').write(generate_audio('Hello from Kokoro.', 'am_michael'))"
-afplay output/test.mp3
+python test/test_audio.py          # writes output/<show>_podcast.mp3
+afplay output/stablecoin_podcast.mp3
 ```
 
-> The Docker/macOS audio test scripts under `test/` target the Piper fallback
-> engine; use the Kokoro steps above to test the default engine.
+For production parity, `./test/test_audio_docker.sh` runs the same audio step
+(`test/test_audio.py`) inside the Docker image, with the Kokoro model baked in.
 
 ## 4. GCP Setup
 

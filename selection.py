@@ -36,6 +36,51 @@ def call_claude_with_retry(max_retries=3, **kwargs):
             time.sleep(wait)
 
 
+def _parse_json_response(response_text):
+    """Extract a JSON object from a Claude response, tolerating code fences and
+    surrounding prose. Raises ValueError if no valid JSON object can be found."""
+    import re
+
+    try:
+        return json.loads(response_text)
+    except json.JSONDecodeError:
+        pass
+
+    cleaned = re.sub(r'^```(?:json)?\s*', '', response_text.strip(), flags=re.MULTILINE)
+    cleaned = re.sub(r'```\s*$', '', cleaned.strip(), flags=re.MULTILINE)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if json_match:
+        try:
+            return json.loads(json_match.group(0))
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Malformed JSON in response: {e}") from e
+
+    raise ValueError("No JSON object found in response")
+
+
+def _call_and_parse_json(max_parse_retries=2, **kwargs):
+    """Call Claude and parse a JSON object from the reply, re-calling on parse
+    failure. call_claude_with_retry covers transient API errors; this adds a
+    retry for the non-deterministic case where the model returns malformed or
+    truncated JSON (the top cause of pipeline failures)."""
+    last_err = None
+    for attempt in range(max_parse_retries + 1):
+        response = call_claude_with_retry(**kwargs)
+        text = response.content[0].text
+        try:
+            return _parse_json_response(text)
+        except ValueError as e:
+            last_err = e
+            print(f"JSON parse failed (attempt {attempt+1}/{max_parse_retries+1}): {e}. "
+                  f"Raw response head:\n{text[:300]}")
+    raise ValueError(f"Could not parse JSON after {max_parse_retries+1} attempts: {last_err}")
+
+
 def select_articles(articles):
     """First pass: Claude selects the most interesting articles for each show"""
 
@@ -80,39 +125,24 @@ def select_articles(articles):
     Do not include any text before or after the JSON object."""
 
     print("Step 1: Selecting top articles...")
-    response = call_claude_with_retry(
-        model=CLAUDE_MODEL,
-        max_tokens=8192,
-        messages=[
-            {
-                "role": "user",
-                "content": f"{selection_prompt}\n\nHeadlines:\n{json.dumps(articles)}"
-            }
-        ]
-    )
-
-    response_text = response.content[0].text
     try:
-        return json.loads(response_text)
-    except json.JSONDecodeError:
-        import re
-        cleaned = re.sub(r'^```(?:json)?\s*', '', response_text.strip(), flags=re.MULTILINE)
-        cleaned = re.sub(r'```\s*$', '', cleaned.strip(), flags=re.MULTILINE)
-        try:
-            return json.loads(cleaned)
-        except json.JSONDecodeError:
-            pass
-        json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group(0))
-        else:
-            print(f"ERROR: Could not parse selection response. Raw response:\n{response_text[:500]}")
-            return {}
+        return _call_and_parse_json(
+            model=CLAUDE_MODEL,
+            max_tokens=8192,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"{selection_prompt}\n\nHeadlines:\n{json.dumps(articles)}"
+                }
+            ]
+        )
+    except ValueError as e:
+        print(f"ERROR: Could not parse selection response after retries: {e}")
+        return {}
 
 
-def generate_scripts(selected_urls, all_articles=None):
-    """Second pass: Generate podcast scripts from full article content"""
-
+def _fetch_articles_by_show(selected_urls, all_articles=None):
+    """Fetch full article content for each show's selected URLs."""
     # Build lookup for pre-fetched content (e.g., email articles)
     prefetched = {}
     if all_articles:
@@ -136,22 +166,16 @@ def generate_scripts(selected_urls, all_articles=None):
                     "content": content
                 })
 
-    # Build dynamic show descriptions from config
-    show_list = []
-    script_keys = []
-    for key, config in SHOWS.items():
-        keywords = ", ".join(config.get('keywords', []))
-        show_list.append(f"- '{config['title']}' (Focus: {keywords})")
-        script_keys.append(f'"{key}_script"')
+    return articles_by_show
 
-    shows_description = "\n    ".join(show_list)
-    keys_description = ", ".join(script_keys)
 
-    system_prompt = f"""You are the Executive Producer of a media network. You run the following daily shows:
-    {shows_description}
+def _build_script_prompt(config):
+    """Build the single-show script-writing prompt."""
+    keywords = ", ".join(config.get('keywords', []))
+    return f"""You are the host and producer of the daily show '{config['title']}' (Focus: {keywords}).
 
     Your Task:
-    1. For EACH show, you have been provided with full article content.
+    1. You have been provided with full article content for this show.
     2. Write a DETAILED 30-SECOND DISCUSSION for each article (approximately 75-90 words per topic).
        - Tone: Conversational, natural speech - like a real radio host, not a news anchor
        - Use contractions (it's, we're, that's) and natural phrasing
@@ -162,11 +186,11 @@ def generate_scripts(selected_urls, all_articles=None):
          * Market impact, trends, or industry significance
        - NO generic statements like "In conclusion" or "This is important"
        - NO brief 1-2 sentence summaries - each topic needs FULL 30-second treatment
-    3. Aggregate all topic summaries into a single podcast script for each show.
+    3. Aggregate all topic summaries into a single podcast script.
        - Start with a natural welcome (1-2 sentences) - sound like a radio host, not a robot
        - After EACH topic, add a clear pause marker: "... [PAUSE] ..."
        - Use smooth transitions: "Next up...", "Meanwhile...", "In other news...", "Moving on...", "Here's an interesting one..."
-       - Each show should have approximately 20 topics with 30 seconds each = ~10 minutes total
+       - The show should have approximately 20 topics with 30 seconds each = ~10 minutes total
        - End with a brief, natural sign-off (1 sentence)
 
     CRITICAL FORMATTING:
@@ -181,31 +205,52 @@ def generate_scripts(selected_urls, all_articles=None):
     - Write "xAI" as "ex A.I." and "GenAI" as "Jen A.I."
     - Avoid leaving bare acronyms that a TTS engine might try to pronounce as a single word
 
-    Return JSON format only with keys: {keys_description}
-    Each value should be the complete podcast script for that show.
+    Return a JSON object with a single key "script" whose value is the complete podcast script.
     Do not include any text before or after the JSON object."""
 
-    print("Step 3: Generating podcast scripts...")
-    response = call_claude_with_retry(
-        model=CLAUDE_MODEL,
-        max_tokens=16000,
-        messages=[
-            {
-                "role": "user",
-                "content": f"{system_prompt}\n\nArticles by Show:\n{json.dumps(articles_by_show)}"
-            }
-        ]
-    )
 
-    response_text = response.content[0].text
+def generate_scripts(selected_urls, all_articles=None):
+    """Second pass: generate one podcast script per show.
 
-    try:
-        return json.loads(response_text)
-    except json.JSONDecodeError:
-        import re
-        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group(0))
-        else:
-            print(f"ERROR: Could not find JSON in response: {response_text[:500]}")
-            raise
+    Each show is generated in its own Claude call so that a malformed/truncated
+    response for one show only loses that show — not all of them — and so no
+    single response has to fit every show's script within one token budget
+    (the previous all-shows-in-one-call design was the main failure mode).
+
+    Returns a dict of ``{"<show_key>_script": text}`` for the shows that
+    succeeded; failed shows are simply omitted and skipped downstream.
+    """
+    articles_by_show = _fetch_articles_by_show(selected_urls, all_articles)
+
+    print("Step 3: Generating podcast scripts (one call per show)...")
+    scripts = {}
+    for show_key, articles in articles_by_show.items():
+        config = SHOWS.get(show_key, {})
+        title = config.get('title', show_key)
+        if not articles:
+            print(f"  ✗ {title}: no article content — skipping")
+            continue
+        try:
+            result = _call_and_parse_json(
+                model=CLAUDE_MODEL,
+                max_tokens=8192,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"{_build_script_prompt(config)}\n\nArticles:\n{json.dumps(articles)}"
+                    }
+                ]
+            )
+            script_text = result.get("script") or result.get(f"{show_key}_script")
+            if script_text:
+                scripts[f"{show_key}_script"] = script_text
+                print(f"  ✓ {title}: script generated ({len(script_text)} chars)")
+            else:
+                print(f"  ✗ {title}: response contained no 'script' field")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            print(f"  ✗ {title}: script generation failed: {e}")
+
+    if not scripts:
+        raise RuntimeError("Script generation produced no scripts for any show")
+
+    return scripts

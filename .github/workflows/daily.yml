@@ -4,7 +4,10 @@ name: Daily Podcast
 # cap) and publishes to GCS. Replaces the Cloud Run service for the scheduled run.
 on:
   schedule:
-    - cron: "0 13 * * *"   # 13:00 UTC = 08:00 EST
+    # 11:00 UTC = 07:00 EDT (summer) / 06:00 EST (winter). Fixed-UTC cron does
+    # not shift for DST, so this starts 6–7am ET year-round — a 2h+ buffer
+    # before the 9am ET target, even if the auto-retry adds a second run.
+    - cron: "0 11 * * *"
   workflow_dispatch: {}     # allow manual runs from the Actions tab
 
 jobs:
@@ -17,6 +20,7 @@ jobs:
     permissions:
       contents: read
       id-token: write        # required for Workload Identity Federation (keyless GCP auth)
+      issues: write          # required to open a failure-alert issue (see final step)
     steps:
       - uses: actions/checkout@v4
 
@@ -53,3 +57,22 @@ jobs:
           KOKORO_MODEL_PATH: kokoro/kokoro-v1.0.int8.onnx
           KOKORO_VOICES_PATH: kokoro/voices-v1.0.bin
         run: python main.py run
+
+      # Self-contained failure alert (no external secret / no Gmail token).
+      # Only fires once the auto-retry has also failed (run_attempt >= 2), so a
+      # transient first-attempt failure that the retry fixes stays quiet.
+      - name: Alert on repeated failure
+        if: failure() && github.run_attempt >= 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Daily Podcast pipeline failed ($(date -u +%Y-%m-%d))" \
+            --body "The daily podcast pipeline failed on attempt ${{ github.run_attempt }} (after auto-retry).
+
+          Run: $RUN_URL
+
+          Check the \"Run pipeline\" step logs for the per-show ✓/✗ summary." \
+            || echo "WARNING: could not open failure-alert issue"
