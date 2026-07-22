@@ -70,9 +70,12 @@ jobs:
           gh issue create \
             --repo "${{ github.repository }}" \
             --title "Daily Podcast pipeline failed ($(date -u +%Y-%m-%d))" \
+            --assignee "${{ github.repository_owner }}" \
             --body "The daily podcast pipeline failed on attempt ${{ github.run_attempt }} (after auto-retry).
 
           Run: $RUN_URL
 
-          Check the \"Run pipeline\" step logs for the per-show ✓/✗ summary." \
+          Check the \"Run pipeline\" step logs for the per-show ✓/✗ summary.
+          Common cause: depleted Anthropic API credits (fast ~1min failure) —
+          check console.anthropic.com/settings/billing." \
             || echo "WARNING: could not open failure-alert issue"
