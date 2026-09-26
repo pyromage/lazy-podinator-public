@@ -21,10 +21,21 @@ jobs:
       contents: read
       id-token: write        # required for Workload Identity Federation (keyless GCP auth)
       issues: write          # required to open a failure-alert issue (see final step)
+      actions: write         # required for the keepalive step below
     steps:
-      - uses: actions/checkout@v4
+      # GitHub disables scheduled workflows on public repos after 60 days
+      # without a commit. Re-enabling this workflow on every run resets that
+      # timer, so the daily schedule never lapses during quiet periods.
+      - name: Keep schedule alive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PUT "repos/${{ github.repository }}/actions/workflows/daily.yml/enable" \
+            || echo "WARNING: keepalive failed"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -42,7 +53,7 @@ jobs:
           curl -sL https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin -o kokoro/voices-v1.0.bin
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_SA_EMAIL }}
@@ -52,7 +63,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
-          CLAUDE_MODEL: claude-sonnet-4-6
+          CLAUDE_MODEL: claude-sonnet-5
           TTS_ENGINE: kokoro
           KOKORO_MODEL_PATH: kokoro/kokoro-v1.0.int8.onnx
           KOKORO_VOICES_PATH: kokoro/voices-v1.0.bin

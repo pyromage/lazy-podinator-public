@@ -1,5 +1,5 @@
 flask>=3.0.0
-anthropic>=0.76.0
+anthropic>=1.0.0
 feedparser
 google-cloud-storage
 requests

@@ -20,7 +20,10 @@ def get_storage_client():
     if _storage_client is None:
         _storage_client = storage.Client()
     return _storage_client
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5")
+# Thinking effort (low|medium|high|max). The API default (high) can spend the
+# whole max_tokens budget thinking before any JSON is written.
+CLAUDE_EFFORT = os.environ.get("CLAUDE_EFFORT", "medium")
 GMAIL_ENABLED = os.environ.get("GMAIL_ENABLED", "").lower() == "true"
 
 # Text-to-speech engine: "kokoro" (default, higher quality) or "piper" (fallback)

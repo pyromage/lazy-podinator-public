@@ -28,7 +28,8 @@ Edit `.env` with your values:
 
 ```bash
 export ANTHROPIC_API_KEY="your-key"
-export CLAUDE_MODEL="claude-sonnet-4-6"
+export CLAUDE_MODEL="claude-sonnet-5"
+export CLAUDE_EFFORT="medium"
 export PROJECT_ID="your-gcp-project-id"
 export BUCKET_NAME="your-podcast-bucket-name"
 export REGION="northamerica-northeast1"

@@ -4,7 +4,7 @@ import json
 import time
 import anthropic
 
-from config import anthropic_client, CLAUDE_MODEL, SHOWS
+from config import anthropic_client, CLAUDE_MODEL, CLAUDE_EFFORT, SHOWS
 from ingestion import fetch_article_content
 
 
@@ -63,6 +63,23 @@ def _parse_json_response(response_text):
     raise ValueError("No JSON object found in response")
 
 
+def _json_output_config(properties):
+    """output_config that constrains the reply to a JSON object with the given
+    required properties (structured outputs), plus the configured effort."""
+    return {
+        "effort": CLAUDE_EFFORT,
+        "format": {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": properties,
+                "required": list(properties),
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
 def _call_and_parse_json(max_parse_retries=2, **kwargs):
     """Call Claude and parse a JSON object from the reply, re-calling on parse
     failure. call_claude_with_retry covers transient API errors; this adds a
@@ -71,7 +88,11 @@ def _call_and_parse_json(max_parse_retries=2, **kwargs):
     last_err = None
     for attempt in range(max_parse_retries + 1):
         response = call_claude_with_retry(**kwargs)
-        text = response.content[0].text
+        # Newer models return thinking blocks before the text, so content[0]
+        # is not necessarily text — join all text blocks instead.
+        text = "".join(b.text for b in response.content if b.type == "text")
+        if response.stop_reason == "max_tokens":
+            print("WARNING: response hit max_tokens and may be truncated")
         try:
             return _parse_json_response(text)
         except ValueError as e:
@@ -128,7 +149,10 @@ def select_articles(articles):
     try:
         return _call_and_parse_json(
             model=CLAUDE_MODEL,
-            max_tokens=8192,
+            max_tokens=16000,
+            output_config=_json_output_config(
+                {key: {"type": "array", "items": {"type": "string"}} for key in SHOWS}
+            ),
             messages=[
                 {
                     "role": "user",
@@ -233,7 +257,8 @@ def generate_scripts(selected_urls, all_articles=None):
         try:
             result = _call_and_parse_json(
                 model=CLAUDE_MODEL,
-                max_tokens=8192,
+                max_tokens=16000,
+                output_config=_json_output_config({"script": {"type": "string"}}),
                 messages=[
                     {
                         "role": "user",
