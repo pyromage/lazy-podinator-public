@@ -63,7 +63,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
-          CLAUDE_MODEL: claude-sonnet-5
+          CLAUDE_MODEL: claude-sonnet-5-5
           TTS_ENGINE: kokoro
           KOKORO_MODEL_PATH: kokoro/kokoro-v1.0.int8.onnx
           KOKORO_VOICES_PATH: kokoro/voices-v1.0.bin
