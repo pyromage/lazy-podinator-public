@@ -48,7 +48,7 @@ Edit `shows_config.json` to define your podcasts. Each show needs:
 | `category` | News, Technology, Business, Science, etc. |
 | `artwork` | Cover image URL (1400x1400 to 3000x3000 px) |
 | `voice` | TTS voice (Piper name; auto-mapped to a Kokoro voice when `TTS_ENGINE=kokoro`) |
-| `duration` | Estimated duration in seconds ("600" = 10 min) |
+| `duration` | Target episode length in seconds ("600" = 10 min); drives script length |
 | `feeds` | Array of RSS feed URLs |
 | `keywords` | Array of topic keywords for AI selection |
 

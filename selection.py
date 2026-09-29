@@ -87,7 +87,17 @@ def _call_and_parse_json(max_parse_retries=2, **kwargs):
     truncated JSON (the top cause of pipeline failures)."""
     last_err = None
     for attempt in range(max_parse_retries + 1):
-        response = call_claude_with_retry(**kwargs)
+        try:
+            response = call_claude_with_retry(**kwargs)
+        except anthropic.APIStatusError as e:
+            # Structured outputs depend on a separate grammar service that can
+            # be briefly unavailable (503). Fall back to unconstrained JSON,
+            # which _parse_json_response already tolerates.
+            if e.status_code < 500 or "format" not in kwargs.get("output_config", {}):
+                raise
+            print(f"Structured output unavailable ({e.status_code}); retrying without schema")
+            kwargs["output_config"] = {"effort": kwargs["output_config"]["effort"]}
+            response = call_claude_with_retry(**kwargs)
         # Newer models return thinking blocks before the text, so content[0]
         # is not necessarily text — join all text blocks instead.
         text = "".join(b.text for b in response.content if b.type == "text")
@@ -145,6 +155,10 @@ def select_articles(articles):
     Example: {{"stablecoin": ["url1", "url2", ...], "ai": ["url3", "url4", ...]}}
     Do not include any text before or after the JSON object."""
 
+    # Only what selection needs — fallback summaries/full text would bloat the prompt
+    headlines = [{k: a[k] for k in ("title", "link", "snippet", "source") if k in a}
+                 for a in articles]
+
     print("Step 1: Selecting top articles...")
     try:
         return _call_and_parse_json(
@@ -156,7 +170,7 @@ def select_articles(articles):
             messages=[
                 {
                     "role": "user",
-                    "content": f"{selection_prompt}\n\nHeadlines:\n{json.dumps(articles)}"
+                    "content": f"{selection_prompt}\n\nHeadlines:\n{json.dumps(headlines)}"
                 }
             ]
         )
@@ -167,12 +181,15 @@ def select_articles(articles):
 
 def _fetch_articles_by_show(selected_urls, all_articles=None):
     """Fetch full article content for each show's selected URLs."""
-    # Build lookup for pre-fetched content (e.g., email articles)
+    # Build lookups for pre-fetched content (e.g., email articles) and for
+    # RSS summaries used when the full article can't be fetched
     prefetched = {}
-    if all_articles:
-        for article in all_articles:
-            if article.get("full_text"):
-                prefetched[article["link"]] = article["full_text"]
+    summaries = {}
+    for article in all_articles or []:
+        if article.get("full_text"):
+            prefetched[article["link"]] = article["full_text"]
+        if len(article.get("summary", "")) > 80:
+            summaries[article["link"]] = f"{article['title']}\n{article['summary']}"
 
     print("Step 2: Fetching full article content...")
     articles_by_show = {}
@@ -182,13 +199,21 @@ def _fetch_articles_by_show(selected_urls, all_articles=None):
         config = SHOWS.get(show_key, {})
         print(f"  {config.get('title', show_key)}: Fetching {len(urls)} articles...")
 
+        full = summary_only = 0
         for url in urls[:20]:
             content = prefetched.get(url) or fetch_article_content(url)
             if content:
+                full += 1
+                articles_by_show[show_key].append({"url": url, "content": content})
+            elif url in summaries:
+                summary_only += 1
                 articles_by_show[show_key].append({
                     "url": url,
-                    "content": content
+                    "content": summaries[url],
+                    "summary_only": True,
                 })
+        print(f"    {full} full articles, {summary_only} summary-only, "
+              f"{min(len(urls), 20) - full - summary_only} unusable")
 
     return articles_by_show
 
@@ -196,11 +221,16 @@ def _fetch_articles_by_show(selected_urls, all_articles=None):
 def _build_script_prompt(config):
     """Build the single-show script-writing prompt."""
     keywords = ", ".join(config.get('keywords', []))
+    # 'duration' (seconds) is the show's target length; Kokoro reads ~185 wpm.
+    # State the total explicitly — newer models follow length targets
+    # literally and otherwise write short when some articles are thin.
+    minutes = int(config.get('duration', 600)) // 60
+    target_words = minutes * 185
     return f"""You are the host and producer of the daily show '{config['title']}' (Focus: {keywords}).
 
     Your Task:
-    1. You have been provided with full article content for this show.
-    2. Write a DETAILED 30-SECOND DISCUSSION for each article (approximately 75-90 words per topic).
+    1. You have been provided with article content for this show (full text, or headline + summary for some).
+    2. Write a DETAILED DISCUSSION for each article (roughly 100-150 words per topic).
        - Tone: Conversational, natural speech - like a real radio host, not a news anchor
        - Use contractions (it's, we're, that's) and natural phrasing
        - Each topic must include:
@@ -209,16 +239,22 @@ def _build_script_prompt(config):
          * Relevant context, numbers, or quotes from the article
          * Market impact, trends, or industry significance
        - NO generic statements like "In conclusion" or "This is important"
-       - NO brief 1-2 sentence summaries - each topic needs FULL 30-second treatment
+       - NO brief 1-2 sentence summaries - each topic needs full treatment
+       - Articles marked "summary_only" have only a headline and short summary:
+         cover them using just those facts - never invent details
     3. Aggregate all topic summaries into a single podcast script.
        - Start with a natural welcome (1-2 sentences) - sound like a radio host, not a robot
        - After EACH topic, add a clear pause marker: "... [PAUSE] ..."
        - Use smooth transitions: "Next up...", "Meanwhile...", "In other news...", "Moving on...", "Here's an interesting one..."
-       - The show should have approximately 20 topics with 30 seconds each = ~10 minutes total
+       - Cover every article provided
        - End with a brief, natural sign-off (1 sentence)
 
+    TARGET LENGTH: The complete script must be about {target_words} words
+    (~{minutes} minutes spoken). This is the most important requirement - with
+    fewer articles, go deeper on each one (context, implications, numbers)
+    rather than finishing short.
+
     CRITICAL FORMATTING:
-    - Each topic must be 75-90 words
     - After every single topic, include "... [PAUSE] ..." on its own line to create a 2-second break
     - Use natural, conversational language with contractions
 

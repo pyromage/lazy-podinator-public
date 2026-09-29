@@ -1,6 +1,7 @@
 """Content ingestion: RSS feeds, LinkedIn, and Gmail newsletters."""
 
 import json
+import re
 from datetime import datetime, timedelta
 import feedparser
 import requests
@@ -65,7 +66,6 @@ def fetch_linkedin_top_content(urls):
 
 def normalize_for_tts(text):
     """Normalize Unicode text for TTS: convert fancy Unicode letters to ASCII, strip emojis/symbols."""
-    import re
     import unicodedata
 
     text = text.encode('utf-8', errors='ignore').decode('utf-8')
@@ -214,6 +214,9 @@ def fetch_rss_feeds(feed_urls):
                     "title": entry.title,
                     "link": entry.link,
                     "snippet": entry.get('summary', '')[:200],
+                    # Fallback content when the full article can't be fetched
+                    "summary": BeautifulSoup(entry.get('summary', ''), 'html.parser')
+                               .get_text(' ', strip=True)[:1500],
                     "source": "rss"
                 })
         except Exception as e:
@@ -222,12 +225,21 @@ def fetch_rss_feeds(feed_urls):
     return articles
 
 
+_BLOCKED_PAGE = re.compile(
+    r"just a moment|enable javascript and cookies|access denied|403 - forbidden"
+    r"|verify you are human|are you a robot|captcha",
+    re.IGNORECASE,
+)
+
+
 def fetch_article_content(url):
     """Fetch full article content from URL"""
     try:
         response = requests.get(url, timeout=10, headers={
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
+        if response.status_code != 200:
+            return ""
         soup = BeautifulSoup(response.content, 'html.parser')
 
         for script in soup(["script", "style", "nav", "footer", "aside"]):
@@ -246,7 +258,11 @@ def fetch_article_content(url):
 
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         text = '\n'.join(lines)
-        return text[:3000] if text else ""
+        # Bot-challenge / paywall / redirect stubs aren't article content —
+        # returning them makes the model skip the story (or invent details).
+        if len(text) < 300 or _BLOCKED_PAGE.search(text[:1000]):
+            return ""
+        return text[:3000]
 
     except Exception as e:
         print(f"Failed to fetch article {url}: {e}")
