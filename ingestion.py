@@ -3,6 +3,7 @@
 import json
 import re
 from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlparse
 import feedparser
 import requests
 from bs4 import BeautifulSoup
@@ -191,6 +192,15 @@ def _extract_email_body(payload, base64_mod):
     return ""
 
 
+def _unwrap_redirect(link):
+    """Google Alerts feeds wrap every link in a google.com/url redirect page,
+    which can't be fetched as article content. Return the real target URL."""
+    parsed = urlparse(link)
+    if parsed.netloc.endswith("google.com") and parsed.path == "/url":
+        return parse_qs(parsed.query).get("url", [link])[0]
+    return link
+
+
 def fetch_rss_feeds(feed_urls):
     """Fetch articles from RSS feeds, filtering to last 7 days"""
     from time import mktime
@@ -212,7 +222,7 @@ def fetch_rss_feeds(feed_urls):
                     continue
                 articles.append({
                     "title": entry.title,
-                    "link": entry.link,
+                    "link": _unwrap_redirect(entry.link),
                     "snippet": entry.get('summary', '')[:200],
                     # Fallback content when the full article can't be fetched
                     "summary": BeautifulSoup(entry.get('summary', ''), 'html.parser')
