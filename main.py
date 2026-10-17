@@ -169,4 +169,5 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "run":
         _run_cli()
     else:
-        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+        # Container must listen on all interfaces for Cloud Run
+        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))  # nosec B104
